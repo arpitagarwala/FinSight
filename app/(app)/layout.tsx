@@ -90,11 +90,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
         <div className="p-4 border-t border-[#1e1e2e] space-y-1">
           <p className="px-3 text-[10px] font-bold tracking-wider text-slate-500 uppercase mb-2">Connect with Developer</p>
-          <a href="mailto:contact@arpitagarwala.online" className="flex items-center gap-3 px-3 py-2 text-sm text-slate-400 hover:text-indigo-400 hover:bg-indigo-500/10 rounded-lg transition-colors">
+          <a href="mailto:arpitagarwalms@gmail.com" className="flex items-center gap-3 px-3 py-2 text-sm text-slate-400 hover:text-indigo-400 hover:bg-indigo-500/10 rounded-lg transition-colors">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
             Email Feedback
           </a>
-          <a href="https://wa.me/919999999999?text=Hi%20Arpit,%20I%20saw%20your%20FinSight%20App%20and%20wanted%20to%20connect!" target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 px-3 py-2 text-sm text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/10 rounded-lg transition-colors">
+          <a href="https://wa.me/919957414146?text=Hi%20Arpit,%20I%20saw%20your%20FinSight%20App%20and%20wanted%20to%20connect!" target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 px-3 py-2 text-sm text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/10 rounded-lg transition-colors">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
             WhatsApp
           </a>
@@ -110,7 +110,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               </div>
               <div className="overflow-hidden">
                 <p className="text-sm font-medium text-white truncate">{userName}</p>
-                <p className="text-xs text-slate-500">Free Plan</p>
+                <p className="text-xs text-amber-500 font-medium">Premium Plan</p>
               </div>
             </div>
           </div>
