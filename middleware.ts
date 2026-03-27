@@ -27,7 +27,17 @@ export async function middleware(request: NextRequest) {
     const url = request.nextUrl.clone()
     url.searchParams.delete('code')
     url.pathname = '/dashboard'
-    return NextResponse.redirect(url)
+    
+    // Create the redirect response
+    const response = NextResponse.redirect(url)
+    
+    // Crucial: Copy cookies set during the exchange into the new redirect response
+    // Otherwise the session is lost on the very next hop!
+    supabaseResponse.cookies.getAll().forEach((c) => {
+      response.cookies.set(c.name, c.value, c)
+    })
+    
+    return response
   }
 
   const { data: { user } } = await supabase.auth.getUser()
