@@ -1,0 +1,247 @@
+'use client'
+export const dynamic = 'force-dynamic'
+
+import { useEffect, useState, useCallback } from 'react'
+import { Plus, X, Loader2, Download, Check, Clock, AlertCircle } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
+import { formatCurrency, formatDate } from '@/lib/utils'
+import jsPDF from 'jspdf'
+
+type InvoiceItem = { description: string; qty: number; rate: number }
+type Invoice = { id: string; invoice_number: string; client_name: string; client_email: string; items: InvoiceItem[]; gst_rate: number; subtotal: number; gst_amount: number; total: number; status: string; issue_date: string; due_date: string; notes: string }
+
+function downloadPDF(inv: Invoice, userName: string) {
+  const doc = new jsPDF()
+  doc.setFillColor(17, 16, 36)
+  doc.rect(0, 0, 210, 297, 'F')
+  doc.setTextColor(241, 245, 249)
+  doc.setFontSize(28)
+  doc.setFont('helvetica', 'bold')
+  doc.text('INVOICE', 20, 30)
+  doc.setFontSize(11)
+  doc.setFont('helvetica', 'normal')
+  doc.setTextColor(148, 163, 184)
+  doc.text(`#${inv.invoice_number}`, 20, 40)
+  doc.text(`From: ${userName}`, 20, 50)
+  doc.setTextColor(241, 245, 249)
+  doc.text(`Bill To: ${inv.client_name}`, 20, 65)
+  if (inv.client_email) doc.text(inv.client_email, 20, 72)
+  doc.setTextColor(148, 163, 184)
+  doc.text(`Issue Date: ${formatDate(inv.issue_date)}`, 130, 65)
+  if (inv.due_date) doc.text(`Due Date: ${formatDate(inv.due_date)}`, 130, 72)
+  doc.setFillColor(30, 30, 46)
+  doc.rect(20, 85, 170, 10, 'F')
+  doc.setTextColor(241, 245, 249)
+  doc.setFontSize(10)
+  doc.text('Description', 25, 92)
+  doc.text('Qty', 110, 92)
+  doc.text('Rate', 130, 92)
+  doc.text('Amount', 160, 92)
+  let y = 105
+  inv.items.forEach((item, i) => {
+    doc.setTextColor(i % 2 === 0 ? '#f1f5f9' : '#94a3b8')
+    doc.text(item.description, 25, y)
+    doc.text(String(item.qty), 110, y)
+    doc.text(formatCurrency(item.rate), 130, y)
+    doc.text(formatCurrency(item.qty * item.rate), 160, y)
+    y += 10
+  })
+  y += 5
+  doc.setTextColor(148, 163, 184)
+  doc.text(`Subtotal: ${formatCurrency(inv.subtotal)}`, 130, y); y += 8
+  if (inv.gst_rate > 0) { doc.text(`GST (${inv.gst_rate}%): ${formatCurrency(inv.gst_amount)}`, 130, y); y += 8 }
+  doc.setFontSize(13)
+  doc.setTextColor(99, 102, 241)
+  doc.setFont('helvetica', 'bold')
+  doc.text(`Total: ${formatCurrency(inv.total)}`, 130, y)
+  if (inv.notes) { y += 15; doc.setFontSize(10); doc.setTextColor(148, 163, 184); doc.setFont('helvetica', 'normal'); doc.text(`Notes: ${inv.notes}`, 20, y) }
+  doc.save(`Invoice-${inv.invoice_number}.pdf`)
+}
+
+const STATUS_CONFIG: Record<string, { badge: string; icon: any; label: string }> = {
+  pending: { badge: 'badge-yellow', icon: Clock, label: 'Pending' },
+  paid: { badge: 'badge-green', icon: Check, label: 'Paid' },
+  overdue: { badge: 'badge-red', icon: AlertCircle, label: 'Overdue' },
+}
+
+export default function InvoicesPage() {
+  const supabase = createClient()
+  const [invoices, setInvoices] = useState<Invoice[]>([])
+  const [loading, setLoading] = useState(true)
+  const [showModal, setShowModal] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [userName, setUserName] = useState('')
+  const [items, setItems] = useState<InvoiceItem[]>([{ description: '', qty: 1, rate: 0 }])
+  const [form, setForm] = useState({ client_name: '', client_email: '', gst_rate: '18', status: 'pending', issue_date: new Date().toISOString().split('T')[0], due_date: '', notes: '' })
+
+  const load = useCallback(async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    setUserName(user.user_metadata?.full_name || user.email || '')
+    const { data } = await supabase.from('invoices').select('*').eq('user_id', user.id).order('created_at', { ascending: false })
+    setInvoices(data ?? [])
+    setLoading(false)
+  }, [])
+
+  useEffect(() => { load() }, [load])
+
+  const subtotal = items.reduce((s, i) => s + i.qty * i.rate, 0)
+  const gstAmt = subtotal * (parseFloat(form.gst_rate) / 100)
+  const total = subtotal + gstAmt
+
+  async function handleSave(e: React.FormEvent) {
+    e.preventDefault()
+    setSaving(true)
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    const num = `INV-${Date.now().toString().slice(-6)}`
+    await supabase.from('invoices').insert({ user_id: user.id, invoice_number: num, client_name: form.client_name, client_email: form.client_email, items, gst_rate: parseFloat(form.gst_rate), subtotal, gst_amount: gstAmt, total, status: form.status, issue_date: form.issue_date, due_date: form.due_date || null, notes: form.notes })
+    setSaving(false); setShowModal(false)
+    setItems([{ description: '', qty: 1, rate: 0 }])
+    setForm({ client_name: '', client_email: '', gst_rate: '18', status: 'pending', issue_date: new Date().toISOString().split('T')[0], due_date: '', notes: '' })
+    load()
+  }
+
+  async function updateStatus(id: string, status: string, total: number, num: string) {
+    const { data: { user } } = await supabase.auth.getUser()
+    await supabase.from('invoices').update({ status }).eq('id', id)
+    if (status === 'paid' && user) {
+      await supabase.from('transactions').insert({ user_id: user.id, type: 'income', amount: total, category: 'Business', description: `Invoice Payment: ${num}`, date: new Date().toISOString() })
+    }
+    setInvoices(inv => inv.map(i => i.id === id ? { ...i, status } : i))
+  }
+
+  const totalPending = invoices.filter(i => i.status === 'pending').reduce((s, i) => s + Number(i.total), 0)
+  const totalPaid = invoices.filter(i => i.status === 'paid').reduce((s, i) => s + Number(i.total), 0)
+
+  return (
+    <div className="max-w-5xl mx-auto">
+      <div className="page-header">
+        <div><h1 className="section-title">Invoices</h1><p className="text-slate-500 text-sm">Freelancers & businesses</p></div>
+        <button onClick={() => setShowModal(true)} className="btn-primary"><Plus size={16} /> New Invoice</button>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4 mb-6">
+        <div className="stat-card"><span className="stat-label">Pending</span><span className="stat-value text-yellow-400">{formatCurrency(totalPending)}</span></div>
+        <div className="stat-card"><span className="stat-label">Collected</span><span className="stat-value text-emerald-400">{formatCurrency(totalPaid)}</span></div>
+      </div>
+
+      {loading ? (
+        <div className="flex justify-center py-16"><Loader2 className="animate-spin text-indigo-400" size={28} /></div>
+      ) : invoices.length === 0 ? (
+        <div className="card text-center py-16">
+          <p className="text-4xl mb-3">📄</p>
+          <p className="text-slate-400 font-medium mb-1">No invoices yet</p>
+          <button onClick={() => setShowModal(true)} className="btn-primary mx-auto mt-3"><Plus size={16} /> Create Invoice</button>
+        </div>
+      ) : (
+        <div className="card p-0 overflow-hidden">
+          <table className="w-full text-sm">
+            <thead><tr className="border-b border-[#1e1e2e]">
+              {['Invoice #', 'Client', 'Amount', 'Status', 'Due Date', 'Actions'].map(h => (
+                <th key={h} className="text-left px-5 py-3.5 text-xs font-medium text-slate-500">{h}</th>
+              ))}
+            </tr></thead>
+            <tbody className="divide-y divide-[#1e1e2e]">
+              {invoices.map(inv => {
+                const s = STATUS_CONFIG[inv.status] || STATUS_CONFIG.pending
+                return (
+                  <tr key={inv.id} className="hover:bg-[#1a1a2e] transition-colors">
+                    <td className="px-5 py-3.5 text-indigo-400 font-medium">{inv.invoice_number}</td>
+                    <td className="px-5 py-3.5"><p className="text-white">{inv.client_name}</p><p className="text-xs text-slate-500">{inv.client_email}</p></td>
+                    <td className="px-5 py-3.5 font-semibold text-white">{formatCurrency(inv.total)}</td>
+                    <td className="px-5 py-3.5">
+                      <select value={inv.status} onChange={e => updateStatus(inv.id, e.target.value, inv.total, inv.invoice_number)}
+                        className={`badge ${s.badge} bg-transparent border-none cursor-pointer text-xs font-semibold`}>
+                        <option value="pending">Pending</option>
+                        <option value="paid">Paid</option>
+                        <option value="overdue">Overdue</option>
+                        <option value="cancelled">Cancelled</option>
+                      </select>
+                    </td>
+                    <td className="px-5 py-3.5 text-slate-400 text-xs">{inv.due_date ? formatDate(inv.due_date) : '—'}</td>
+                    <td className="px-5 py-3.5">
+                      <button onClick={() => downloadPDF(inv, userName)} className="text-indigo-400 hover:text-indigo-300 transition-colors p-1.5 hover:bg-indigo-500/10 rounded-lg" title="Download PDF">
+                        <Download size={15} />
+                      </button>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {showModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="card w-full max-w-2xl animate-fade-in overflow-y-auto" style={{ maxHeight: '90vh' }}>
+            <div className="flex justify-between items-center mb-5">
+              <h2 className="text-lg font-bold text-white">Create Invoice</h2>
+              <button onClick={() => setShowModal(false)} className="text-slate-500 hover:text-white"><X size={20} /></button>
+            </div>
+            <form onSubmit={handleSave} className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="label">Client Name *</label>
+                  <input type="text" value={form.client_name} onChange={e => setForm(f => ({ ...f, client_name: e.target.value }))} className="input" placeholder="Company / Person" required />
+                </div>
+                <div>
+                  <label className="label">Client Email</label>
+                  <input type="email" value={form.client_email} onChange={e => setForm(f => ({ ...f, client_email: e.target.value }))} className="input" placeholder="client@email.com" />
+                </div>
+              </div>
+              <div>
+                <label className="label">Line Items</label>
+                <div className="space-y-2">
+                  <div className="grid grid-cols-12 gap-2 text-xs text-slate-500 px-1">
+                    <span className="col-span-6">Description</span><span className="col-span-2">Qty</span><span className="col-span-3">Rate (₹)</span>
+                  </div>
+                  {items.map((item, i) => (
+                    <div key={i} className="grid grid-cols-12 gap-2 items-center">
+                      <input className="input col-span-6 text-sm py-2" value={item.description} onChange={e => setItems(it => it.map((x, j) => j === i ? { ...x, description: e.target.value } : x))} placeholder="Service description" required />
+                      <input type="number" className="input col-span-2 text-sm py-2" value={item.qty} min={1} onChange={e => setItems(it => it.map((x, j) => j === i ? { ...x, qty: parseInt(e.target.value) } : x))} />
+                      <input type="number" className="input col-span-3 text-sm py-2" value={item.rate || ''} onChange={e => setItems(it => it.map((x, j) => j === i ? { ...x, rate: parseFloat(e.target.value) } : x))} placeholder="0" />
+                      {items.length > 1 && <button type="button" onClick={() => setItems(it => it.filter((_, j) => j !== i))} className="col-span-1 text-slate-600 hover:text-red-400 transition-colors"><X size={14} /></button>}
+                    </div>
+                  ))}
+                  <button type="button" onClick={() => setItems(it => [...it, { description: '', qty: 1, rate: 0 }])} className="btn-secondary text-xs py-2 mt-1"><Plus size={13} /> Add Item</button>
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="label">GST Rate (%)</label>
+                  <input type="number" value={form.gst_rate} onChange={e => setForm(f => ({ ...f, gst_rate: e.target.value }))} className="input" />
+                </div>
+                <div>
+                  <label className="label">Issue Date</label>
+                  <input type="date" value={form.issue_date} onChange={e => setForm(f => ({ ...f, issue_date: e.target.value }))} className="input" />
+                </div>
+                <div>
+                  <label className="label">Due Date</label>
+                  <input type="date" value={form.due_date} onChange={e => setForm(f => ({ ...f, due_date: e.target.value }))} className="input" />
+                </div>
+              </div>
+              <div className="bg-[#0f0f1a] rounded-xl p-3 text-sm space-y-1">
+                <div className="flex justify-between text-slate-400"><span>Subtotal</span><span>{formatCurrency(subtotal)}</span></div>
+                <div className="flex justify-between text-slate-400"><span>GST ({form.gst_rate}%)</span><span>{formatCurrency(gstAmt)}</span></div>
+                <div className="flex justify-between font-bold text-white text-base pt-1 border-t border-[#1e1e2e] mt-1"><span>Total</span><span className="text-indigo-400">{formatCurrency(total)}</span></div>
+              </div>
+              <div>
+                <label className="label">Notes</label>
+                <textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} className="input resize-none" rows={2} placeholder="Payment terms, bank details, etc." />
+              </div>
+              <div className="flex gap-3 pt-1">
+                <button type="button" onClick={() => setShowModal(false)} className="btn-secondary flex-1">Cancel</button>
+                <button type="submit" disabled={saving} className="btn-primary flex-1">
+                  {saving ? <Loader2 size={16} className="animate-spin" /> : '📄 Create Invoice'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
