@@ -82,22 +82,38 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         })}
       </nav>
 
-      {/* Bottom: Settings + User */}
+      {/* Bottom: Settings, Contact, User */}
       <div className="p-3 border-t border-[#1e1e2e] space-y-1">
         <Link href="/settings" className={pathname === '/settings' ? 'sidebar-link-active' : 'sidebar-link'}>
           <Settings size={17} /><span>Settings</span>
         </Link>
-        <div className="flex items-center gap-3 px-3 py-2.5 mt-1 rounded-xl bg-[#0f0f1a] border border-[#1e1e2e]">
-          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
-            {userName.charAt(0).toUpperCase()}
+
+        <div className="p-4 border-t border-[#1e1e2e] space-y-1">
+          <p className="px-3 text-[10px] font-bold tracking-wider text-slate-500 uppercase mb-2">Connect with Developer</p>
+          <a href="mailto:contact@arpitagarwala.online" className="flex items-center gap-3 px-3 py-2 text-sm text-slate-400 hover:text-indigo-400 hover:bg-indigo-500/10 rounded-lg transition-colors">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+            Email Feedback
+          </a>
+          <a href="https://wa.me/919999999999?text=Hi%20Arpit,%20I%20saw%20your%20FinSight%20App%20and%20wanted%20to%20connect!" target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 px-3 py-2 text-sm text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/10 rounded-lg transition-colors">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+            WhatsApp
+          </a>
+
+          <div className="mt-4 pt-4 border-t border-[#1e1e2e]">
+            <button onClick={handleLogout} className="w-full flex items-center gap-3 px-3 py-2 text-sm text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors mb-2">
+              <LogOut size={18} />
+              Sign Out
+            </button>
+            <div className="flex items-center gap-3 px-3 py-2">
+              <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center text-white font-bold shadow-lg shadow-indigo-500/20">
+                {userName.charAt(0).toUpperCase()}
+              </div>
+              <div className="overflow-hidden">
+                <p className="text-sm font-medium text-white truncate">{userName}</p>
+                <p className="text-xs text-slate-500">Free Plan</p>
+              </div>
+            </div>
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-white truncate">{userName}</p>
-            <p className="text-xs text-slate-500 truncate">{userEmail}</p>
-          </div>
-          <button onClick={handleLogout} className="text-slate-500 hover:text-red-400 transition-colors p-1" title="Sign out">
-            <LogOut size={15} />
-          </button>
         </div>
       </div>
     </div>
