@@ -12,50 +12,130 @@ type Invoice = { id: string; invoice_number: string; client_name: string; client
 
 function downloadPDF(inv: Invoice, userName: string) {
   const doc = new jsPDF()
-  doc.setFillColor(17, 16, 36)
+  const primaryColor = '#6366f1'
+  const secondaryColor = '#94a3b8'
+  
+  // Background
+  doc.setFillColor(15, 15, 26)
   doc.rect(0, 0, 210, 297, 'F')
-  doc.setTextColor(241, 245, 249)
-  doc.setFontSize(28)
+  
+  // Header Branding
+  doc.setFillColor(99, 102, 241)
+  doc.rect(0, 0, 210, 40, 'F')
+  
+  doc.setTextColor('#ffffff')
+  doc.setFontSize(24)
   doc.setFont('helvetica', 'bold')
-  doc.text('INVOICE', 20, 30)
-  doc.setFontSize(11)
-  doc.setFont('helvetica', 'normal')
-  doc.setTextColor(148, 163, 184)
-  doc.text(`#${inv.invoice_number}`, 20, 40)
-  doc.text(`From: ${userName}`, 20, 50)
-  doc.setTextColor(241, 245, 249)
-  doc.text(`Bill To: ${inv.client_name}`, 20, 65)
-  if (inv.client_email) doc.text(inv.client_email, 20, 72)
-  doc.setTextColor(148, 163, 184)
-  doc.text(`Issue Date: ${formatDate(inv.issue_date)}`, 130, 65)
-  if (inv.due_date) doc.text(`Due Date: ${formatDate(inv.due_date)}`, 130, 72)
-  doc.setFillColor(30, 30, 46)
-  doc.rect(20, 85, 170, 10, 'F')
-  doc.setTextColor(241, 245, 249)
+  doc.text('FinSight AI', 20, 25)
+  
   doc.setFontSize(10)
-  doc.text('Description', 25, 92)
-  doc.text('Qty', 110, 92)
-  doc.text('Rate', 130, 92)
-  doc.text('Amount', 160, 92)
-  let y = 105
+  doc.setFont('helvetica', 'normal')
+  doc.text('Professional Invoice Generator', 20, 32)
+  
+  // Invoice Info (Top Right)
+  doc.setFontSize(20)
+  doc.text('INVOICE', 140, 25)
+  doc.setFontSize(10)
+  doc.text(`# ${inv.invoice_number}`, 140, 32)
+  
+  // From / To Section
+  doc.setTextColor('#ffffff')
+  doc.setFontSize(12)
+  doc.setFont('helvetica', 'bold')
+  doc.text('FROM:', 20, 60)
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(10)
+  doc.text(userName, 20, 68)
+  
+  doc.setFontSize(12)
+  doc.setFont('helvetica', 'bold')
+  doc.text('BILL TO:', 120, 60)
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(11)
+  doc.text(inv.client_name, 120, 68)
+  doc.setTextColor(secondaryColor)
+  doc.setFontSize(10)
+  if (inv.client_email) doc.text(inv.client_email, 120, 75)
+  
+  // Dates
+  doc.setTextColor('#ffffff')
+  doc.text(`Issue Date: ${formatDate(inv.issue_date)}`, 20, 85)
+  if (inv.due_date) doc.text(`Due Date: ${formatDate(inv.due_date)}`, 20, 92)
+  
+  // Table Header
+  doc.setFillColor(30, 30, 46) 
+  doc.rect(20, 105, 170, 10, 'F')
+  doc.setTextColor('#ffffff')
+  doc.setFont('helvetica', 'bold')
+  doc.text('Description', 25, 112)
+  doc.text('Qty', 110, 112)
+  doc.text('Rate', 130, 112)
+  doc.text('Amount', 160, 112)
+  
+  // Table Rows
+  let y = 125
+  doc.setFont('helvetica', 'normal')
   inv.items.forEach((item, i) => {
-    doc.setTextColor(i % 2 === 0 ? '#f1f5f9' : '#94a3b8')
+    if (y > 250) { 
+      doc.addPage()
+      doc.setFillColor(15, 15, 26)
+      doc.rect(0, 0, 210, 297, 'F')
+      y = 20 
+    }
+    doc.setTextColor('#f1f5f9')
     doc.text(item.description, 25, y)
     doc.text(String(item.qty), 110, y)
     doc.text(formatCurrency(item.rate), 130, y)
     doc.text(formatCurrency(item.qty * item.rate), 160, y)
-    y += 10
+    doc.setDrawColor(40, 40, 60)
+    doc.line(20, y + 4, 190, y + 4)
+    y += 12
   })
-  y += 5
-  doc.setTextColor(148, 163, 184)
-  doc.text(`Subtotal: ${formatCurrency(inv.subtotal)}`, 130, y); y += 8
-  if (inv.gst_rate > 0) { doc.text(`GST (${inv.gst_rate}%): ${formatCurrency(inv.gst_amount)}`, 130, y); y += 8 }
-  doc.setFontSize(13)
-  doc.setTextColor(99, 102, 241)
+  
+  // Summary Section
+  y += 10
+  doc.setFontSize(10)
+  doc.setTextColor(secondaryColor)
+  doc.text('Subtotal:', 130, y)
+  doc.setTextColor('#ffffff')
+  doc.text(formatCurrency(inv.subtotal), 160, y)
+  
+  y += 8
+  if (inv.gst_rate > 0) {
+    doc.setTextColor(secondaryColor)
+    doc.text(`GST (${inv.gst_rate}%):`, 130, y)
+    doc.setTextColor('#ffffff')
+    doc.text(formatCurrency(inv.gst_amount), 160, y)
+    y += 8
+  }
+  
+  // Total Bar
+  doc.setFillColor(99, 102, 241)
+  doc.rect(125, y - 2, 65, 12, 'F')
+  doc.setTextColor('#ffffff')
+  doc.setFontSize(12)
   doc.setFont('helvetica', 'bold')
-  doc.text(`Total: ${formatCurrency(inv.total)}`, 130, y)
-  if (inv.notes) { y += 15; doc.setFontSize(10); doc.setTextColor(148, 163, 184); doc.setFont('helvetica', 'normal'); doc.text(`Notes: ${inv.notes}`, 20, y) }
-  doc.save(`Invoice-${inv.invoice_number}.pdf`)
+  doc.text('TOTAL:', 130, y + 6)
+  doc.text(formatCurrency(inv.total), 160, y + 6)
+  
+  // Notes & Footer
+  if (inv.notes) {
+    y += 25
+    doc.setFontSize(10)
+    doc.setTextColor('#ffffff')
+    doc.setFont('helvetica', 'bold')
+    doc.text('NOTES / TERMS:', 20, y)
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(secondaryColor)
+    doc.text(inv.notes, 20, y + 8, { maxWidth: 170 })
+  }
+  
+  doc.setFontSize(9)
+  doc.setTextColor(secondaryColor)
+  doc.text('Thank you for your business!', 105, 285, { align: 'center' })
+  doc.text('Generated by FinSight AI - Your Smart Financial Companion', 105, 290, { align: 'center' })
+  
+  doc.save(`FinSight_Invoice_${inv.invoice_number}.pdf`)
 }
 
 const STATUS_CONFIG: Record<string, { badge: string; icon: any; label: string }> = {
@@ -94,7 +174,13 @@ export default function InvoicesPage() {
     setSaving(true)
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
-    const num = `INV-${Date.now().toString().slice(-6)}`
+    
+    // Improved Naming: INV-YYYYMMDD-CLI-RANDOM
+    const datePart = form.issue_date.replace(/-/g, '')
+    const clientPart = form.client_name.slice(0, 3).toUpperCase().replace(/[^A-Z]/g, 'X')
+    const randPart = Math.floor(Math.random() * 1000).toString().padStart(3, '0')
+    const num = `INV-${datePart}-${clientPart}-${randPart}`
+    
     await supabase.from('invoices').insert({ user_id: user.id, invoice_number: num, client_name: form.client_name, client_email: form.client_email, items, gst_rate: parseFloat(form.gst_rate), subtotal, gst_amount: gstAmt, total, status: form.status, issue_date: form.issue_date, due_date: form.due_date || null, notes: form.notes })
     setSaving(false); setShowModal(false)
     setItems([{ description: '', qty: 1, rate: 0 }])
