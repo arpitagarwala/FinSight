@@ -21,6 +21,15 @@ export async function middleware(request: NextRequest) {
     }
   )
 
+  const code = request.nextUrl.searchParams.get('code')
+  if (code) {
+    await supabase.auth.exchangeCodeForSession(code)
+    const url = request.nextUrl.clone()
+    url.searchParams.delete('code')
+    url.pathname = '/dashboard'
+    return NextResponse.redirect(url)
+  }
+
   const { data: { user } } = await supabase.auth.getUser()
   const { pathname } = request.nextUrl
 
