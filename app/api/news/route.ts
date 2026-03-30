@@ -90,8 +90,9 @@ async function fetchFreshNewsDirect() {
   const serpKey = process.env.SERP_API_KEY
   if (!serpKey) return { articles: [], error: 'Missing API Key' }
   try {
+    // Switch to google_news engine for better quality news metadata
     const response = await fetch(
-      `https://serpapi.com/search.json?engine=google&tbm=nws&q=indian+finance+news&gl=in&hl=en&tbs=qdr:d&api_key=${serpKey}`,
+      `https://serpapi.com/search.json?engine=google_news&q=indian+finance+stock+market&gl=in&hl=en&api_key=${serpKey}`,
       { cache: 'no-store' }
     )
     if (!response.ok) {
@@ -99,14 +100,28 @@ async function fetchFreshNewsDirect() {
       return { articles: [], error: `SerpAPI Error: ${response.status} - ${errText}` }
     }
     const data = await response.json()
-    const articles = (data.news_results || []).slice(0, 24).map((item: any) => ({
-      title: item.title,
-      description: item.snippet || '',
-      url: item.link,
-      image: item.thumbnail || '',
-      source: item.source || 'News',
-      published_at: item.published_at || parseRelativeDate(item.date).toISOString()
-    }))
+    const rawResults = data.news_results || []
+    
+    // Universal Free Filter
+    const freeSources = ['ndtv', 'cnbctv18', 'reuters', 'zeebiz', 'zee business', 'firstpost', 'times of india', 'india today', 'the hindu', 'indian express', 'the quint', 'news18', 'moneycontrol']
+    const blocklist = ['economic times', 'business standard', 'financial express', 'mint', 'livemint', 'bloomberg', 'wsj', 'barrons']
+
+    const articles = rawResults
+      .filter((item: any) => {
+        const sourceName = (item.source?.name || item.source || '').toLowerCase()
+        const isWhitelisted = freeSources.some(allowed => sourceName.includes(allowed))
+        const isBlacklisted = blocklist.some(blocked => sourceName.includes(blocked))
+        return isWhitelisted && !isBlacklisted
+      })
+      .slice(0, 24)
+      .map((item: any) => ({
+        title: item.title,
+        description: item.snippet || '',
+        url: item.link,
+        image: item.thumbnail || '',
+        source: item.source?.name || item.source || 'News',
+        published_at: item.published_at || parseRelativeDate(item.date).toISOString()
+      }))
     return { articles, error: null }
   } catch (err: any) {
     return { articles: [], error: err.message }
@@ -121,9 +136,9 @@ async function refreshNewsFromSerpApi(supabase: any, logs: string[]) {
   }
 
   try {
-    // Added tbs=qdr:d for past 24 hours of news to ensure freshness
+    // Use google_news engine
     const response = await fetch(
-       `https://serpapi.com/search.json?engine=google&tbm=nws&q=indian+finance+stock+market+news&gl=in&tbs=qdr:d&api_key=${serpKey}`,
+       `https://serpapi.com/search.json?engine=google_news&q=indian+finance+stock+market&gl=in&hl=en&api_key=${serpKey}`,
       { cache: 'no-store' }
     )
     
@@ -137,13 +152,16 @@ async function refreshNewsFromSerpApi(supabase: any, logs: string[]) {
     const rawResults = data.news_results || []
     logs.push(`SerpAPI returned ${rawResults.length} articles`)
 
-    // Strictly filtering for FREE/LEGIT sources as requested
-    const freeSources = ['moneycontrol', 'ndtv', 'zeebiz', 'zee business', 'cnbctv18', 'reuters', 'firstpost', 'times of india', 'india today', 'hindustantimes', 'news18', 'the hindu', 'indian express', 'the quint', 'the news minute']
+    // Universal Free Filter
+    const freeSources = ['ndtv', 'cnbctv18', 'reuters', 'zeebiz', 'zee business', 'firstpost', 'times of india', 'india today', 'the hindu', 'indian express', 'the quint', 'news18', 'moneycontrol']
+    const blocklist = ['economic times', 'business standard', 'financial express', 'mint', 'livemint', 'bloomberg', 'wsj', 'barrons']
     
     const processedArticles = rawResults
       .filter((item: any) => {
-        const sourceName = (item.source || '').toLowerCase()
-        return freeSources.some(allowed => sourceName.includes(allowed))
+        const sourceName = (item.source?.name || item.source || '').toLowerCase()
+        const isWhitelisted = freeSources.some(allowed => sourceName.includes(allowed))
+        const isBlacklisted = blocklist.some(blocked => sourceName.includes(blocked))
+        return isWhitelisted && !isBlacklisted
       })
       .slice(0, 30)
       .map((item: any) => {
@@ -153,12 +171,15 @@ async function refreshNewsFromSerpApi(supabase: any, logs: string[]) {
           description: item.snippet || '',
           url: item.link,
           image: item.thumbnail || '',
-          source: item.source || 'News',
+          source: item.source?.name || item.source || 'News',
           published_at: pubAt.toISOString()
         }
       })
 
     if (processedArticles.length > 0) {
+      // CLEAR OLD NEWS: Purge everything to start fresh with free news
+      await supabase.from('news').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+      
       logs.push(`Inserting ${processedArticles.length} filtered free articles.`)
       const { error: upsertError } = await supabase
         .from('news')
