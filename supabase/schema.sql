@@ -158,3 +158,23 @@ $$ language plpgsql security definer;
 create or replace trigger on_auth_user_created
   after insert on auth.users
   for each row execute procedure public.handle_new_user();
+
+-- News table for persistent finance news
+create table if not exists public.news (
+  id uuid default uuid_generate_v4() primary key,
+  title text not null,
+  description text,
+  url text unique not null,
+  source text,
+  image text,
+  category text default 'finance',
+  published_at timestamptz not null,
+  created_at timestamptz default now()
+);
+
+-- Enable RLS and public read access
+alter table public.news enable row level security;
+create policy "Anyone can read news" on public.news for select using (true);
+
+-- Index for fast sorting by date
+create index if not exists idx_news_published_at on public.news (published_at desc);
