@@ -1,127 +1,166 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
-// Important: This route needs to be dynamic to ensure fresh maintenance checks
 export const dynamic = 'force-dynamic'
 
-// Throttling: Only fetch from external SerpAPI if the latest DB entry is older than this
-const REFRESH_THRESHOLD_MS = 60 * 60 * 1000 // 1 hour for manual/auto refresh check
-const CACHE_LIFETIME_MS = 4 * 60 * 60 * 1000 // 4 hours before we definitely refresh
+const REFRESH_THRESHOLD_MS = 60 * 60 * 1000 // 1 hour
 
 export async function GET() {
   const supabase = await createClient()
   
   try {
-    // 1. Check if we need to refresh from SerpAPI
-    // We get the most recent entry from the DB to see how fresh our data is
-    const { data: latestEntry } = await supabase
+    console.log('--- News Fetch Started ---')
+    
+    // 1. Initial check: Is the DB empty or stale?
+    const { data: latestEntry, error: checkError } = await supabase
       .from('news')
-      .select('created_at')
+      .select('created_at, published_at')
       .order('created_at', { ascending: false })
       .limit(1)
-      .single()
+
+    if (checkError) {
+      console.error('Supabase News Check Error:', checkError)
+      // Fallback to direct SerpAPI if DB table is missing or broken
+      const fallback = await fetchFreshNewsDirect()
+      return NextResponse.json({ articles: fallback, warning: 'Database check failed, using direct fallback' })
+    }
 
     const now = Date.now()
-    const lastFetchTime = latestEntry ? new Date(latestEntry.created_at).getTime() : 0
+    const lastFetchTime = latestEntry?.[0] ? new Date(latestEntry[0].created_at).getTime() : 0
     const timeSinceLastFetch = now - lastFetchTime
 
-    // Only fetch if data is older than threshold
-    if (timeSinceLastFetch > REFRESH_THRESHOLD_MS) {
+    console.log(`Last fetch was ${Math.round(timeSinceLastFetch / 1000 / 60)} mins ago (Threshold: ${REFRESH_THRESHOLD_MS / 1000 / 60}m)`)
+
+    // 2. Trigger background refresh if stale or empty
+    if (timeSinceLastFetch > REFRESH_THRESHOLD_MS || !latestEntry || latestEntry.length === 0) {
+      console.log('Triggering SerpAPI Refresh...')
       await refreshNewsFromSerpApi(supabase)
     }
 
-    // 2. Query news from our DB
-    const { data: articles, error } = await supabase
+    // 3. Final Query from DB
+    const { data: articles, error: fetchError } = await supabase
       .from('news')
       .select('*')
       .order('published_at', { ascending: false })
       .limit(48)
 
-    if (error) throw error
+    if (fetchError) {
+      console.error('Supabase Final Fetch Error:', fetchError)
+    }
 
-    return NextResponse.json({ articles: articles || [] })
+    // If DB is still empty (e.g., first run and refresh is still processing or failed), return direct fallback
+    if (!articles || articles.length === 0) {
+      console.log('DB still empty, fetching direct content...')
+      const direct = await fetchFreshNewsDirect()
+      return NextResponse.json({ articles: direct })
+    }
+
+    console.log(`Returning ${articles.length} articles from DB`)
+    return NextResponse.json({ articles })
   } catch (error) {
-    console.error('News API Route Error:', error)
-    return NextResponse.json({ articles: [] }, { status: 500 })
+    console.error('CRITICAL News API Error:', error)
+    const direct = await fetchFreshNewsDirect()
+    return NextResponse.json({ articles: direct, error: 'Internal server error, fallback used' })
+  }
+}
+
+async function fetchFreshNewsDirect() {
+  const serpKey = process.env.SERP_API_KEY
+  if (!serpKey) return []
+  try {
+    const response = await fetch(
+      `https://serpapi.com/search.json?engine=google_search&tbm=nws&q=indian+stock+market+finance+economy+news&gl=in&hl=en&api_key=${serpKey}`,
+      { cache: 'no-store' }
+    )
+    if (!response.ok) return []
+    const data = await response.json()
+    return (data.news_results || []).slice(0, 24).map((item: any) => ({
+      title: item.title,
+      description: item.snippet || '',
+      url: item.link,
+      image: item.thumbnail || '',
+      source: item.source || 'Google News',
+      published_at: item.published_at || parseRelativeDate(item.date).toISOString()
+    }))
+  } catch {
+    return []
   }
 }
 
 async function refreshNewsFromSerpApi(supabase: any) {
   const serpKey = process.env.SERP_API_KEY
-  if (!serpKey) return
+  if (!serpKey) {
+    console.warn('MISSING SERP_API_KEY')
+    return
+  }
 
   try {
-    // Use google_search with tbm=nws for more consistent and sortable results
     const response = await fetch(
-      `https://serpapi.com/search.json?engine=google_search&tbm=nws&q=indian+stock+market+finance+economy+news&gl=in&hl=en&api_key=${serpKey}`,
+       `https://serpapi.com/search.json?engine=google_search&tbm=nws&q=indian+stock+market+finance+economy+news&gl=in&hl=en&api_key=${serpKey}`,
       { cache: 'no-store' }
     )
     
-    if (!response.ok) return
+    if (!response.ok) {
+      console.error('SerpAPI Error:', await response.text())
+      return
+    }
 
     const data = await response.json()
     const rawResults = data.news_results || []
+    console.log(`Fetched ${rawResults.length} raw articles from SerpAPI`)
 
     const allowedNames = ['economic times', 'times of india', 'moneycontrol', 'ndtv', 'mint', 'livemint', 'business standard', 'financial express', 'zee business', 'cnbctv18', 'hindustan times', 'reuters', 'firstpost']
     
     const processedArticles = rawResults
       .filter((item: any) => {
         const sourceName = (item.source || '').toLowerCase()
-        return allowedNames.some(allowed => sourceName.includes(allowed))
+        const isAllowed = allowedNames.some(allowed => sourceName.includes(allowed))
+        return isAllowed
       })
       .map((item: any) => {
-        const published_at = parseRelativeDate(item.date)
+        // Use published_at from SerpAPI if available, else parse relative date
+        const pubAt = item.published_at ? new Date(item.published_at) : parseRelativeDate(item.date)
         return {
           title: item.title,
           description: item.snippet || '',
           url: item.link,
           image: item.thumbnail || '',
-          source: item.source || 'Google News',
-          published_at: published_at.toISOString()
+          source: item.source || 'News',
+          published_at: pubAt.toISOString()
         }
       })
 
-    // Upsert into DB (duplicates on URL will be ignored or updated)
+    console.log(`Filtered down to ${processedArticles.length} valid articles`)
+
     if (processedArticles.length > 0) {
       const { error: upsertError } = await supabase
         .from('news')
         .upsert(processedArticles, { onConflict: 'url' })
       
-      if (upsertError) console.error('Supabase Upsert Error:', upsertError)
+      if (upsertError) {
+        console.error('UPSERT FAILED:', upsertError)
+      } else {
+        console.log('Successfully upserted news into database')
+      }
     }
 
-    // Maintenance: Delete news older than 6 months
     const sixMonthsAgo = new Date()
     sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6)
-    
-    await supabase
-      .from('news')
-      .delete()
-      .lt('published_at', sixMonthsAgo.toISOString())
+    await supabase.from('news').delete().lt('published_at', sixMonthsAgo.toISOString())
 
   } catch (error) {
-    console.error('SerpAPI Fetch/Upsert Error:', error)
+    console.error('Refresh Execution Error:', error)
   }
 }
 
-// Helper to convert SerpAPI relative strings to real dates
 function parseRelativeDate(dateStr: string): Date {
   if (!dateStr) return new Date()
-  
   const now = new Date()
   const lower = dateStr.toLowerCase().trim()
-  
-  // Handled formats: "2 hours ago", "1 day ago", "15 minutes ago", "3 weeks ago"
   const match = lower.match(/(\d+)\s+(minute|hour|day|week|month)s?\s+ago/)
-  if (!match) {
-    // Attempt standard parse as fallback
-    const parsed = new Date(dateStr)
-    return isNaN(parsed.getTime()) ? now : parsed
-  }
-
+  if (!match) return now
   const num = parseInt(match[1], 10)
   const unit = match[2]
-
   switch (unit) {
     case 'minute': return new Date(now.getTime() - num * 60 * 1000)
     case 'hour': return new Date(now.getTime() - num * 60 * 60 * 1000)

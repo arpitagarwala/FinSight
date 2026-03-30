@@ -44,8 +44,10 @@ export default function NewsPage() {
 
   const validArticles = articles.filter(a => {
     if (!a.published_at) return true
-    const diffDays = (Date.now() - new Date(a.published_at).getTime()) / (1000 * 86400)
-    return diffDays <= 185 // Approx 6 months
+    const date = new Date(a.published_at)
+    if (isNaN(date.getTime())) return true // Show it anyway if date is weird
+    const diffDays = (Date.now() - date.getTime()) / (1000 * 86400)
+    return diffDays <= 200 // Relaxed 6-month check
   })
 
   return (
@@ -59,27 +61,34 @@ export default function NewsPage() {
         <div className="flex justify-center py-24"><Loader2 className="animate-spin text-indigo-400" size={32} /></div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {validArticles.map((a: any, i) => (
-            <a key={i} href={a.url} target="_blank" rel="noopener noreferrer" className="card-hover group block flex flex-col h-full">
-              {a.image && (
-                <div className="w-full h-40 rounded-xl overflow-hidden mb-4 relative bg-[#0f0f1a]">
-                  <img src={a.image} alt={a.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                  <div className="absolute inset-0 bg-gradient-to-t from-[#13131f] to-transparent"></div>
+          {validArticles.length > 0 ? (
+            validArticles.map((a: any, i) => (
+              <a key={i} href={a.url} target="_blank" rel="noopener noreferrer" className="card-hover group block flex flex-col h-full">
+                {a.image && (
+                  <div className="w-full h-40 rounded-xl overflow-hidden mb-4 relative bg-[#0f0f1a]">
+                    <img src={a.image} alt={a.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-[#13131f] to-transparent"></div>
+                  </div>
+                )}
+                <div className="flex flex-col flex-1">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="badge badge-blue text-[10px]">{a.source}</span>
+                    {a.published_at && <span className="text-xs text-slate-600">{timeAgo(a.published_at)}</span>}
+                  </div>
+                  <h3 className="font-semibold text-slate-200 text-sm leading-snug mb-2 group-hover:text-white transition-colors line-clamp-3">{a.title}</h3>
+                  {a.description && <p className="text-slate-600 text-xs leading-relaxed line-clamp-2 mt-auto">{a.description}</p>}
+                  <div className="flex items-center gap-1 mt-4 text-indigo-400 text-xs font-semibold">
+                    <ExternalLink size={11} /> Read Article
+                  </div>
                 </div>
-              )}
-              <div className="flex flex-col flex-1">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="badge badge-blue text-[10px]">{a.source}</span>
-                  {a.published_at && <span className="text-xs text-slate-600">{timeAgo(a.published_at)}</span>}
-                </div>
-                <h3 className="font-semibold text-slate-200 text-sm leading-snug mb-2 group-hover:text-white transition-colors line-clamp-3">{a.title}</h3>
-                {a.description && <p className="text-slate-600 text-xs leading-relaxed line-clamp-2 mt-auto">{a.description}</p>}
-                <div className="flex items-center gap-1 mt-4 text-indigo-400 text-xs font-semibold">
-                  <ExternalLink size={11} /> Read Article
-                </div>
-              </div>
-            </a>
-          ))}
+              </a>
+            ))
+          ) : (
+            <div className="col-span-full py-20 text-center">
+              <p className="text-slate-500 mb-4">No recent news articles found.</p>
+              <button onClick={fetchNews} className="btn-secondary mx-auto">Try Refreshing</button>
+            </div>
+          )}
         </div>
       )}
     </div>
