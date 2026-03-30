@@ -49,18 +49,23 @@ export async function GET() {
     }
 
     // If DB is still empty (e.g., first run and refresh is still processing or failed), return direct fallback
-    if (!articles || articles.length === 0) {
-      console.log('DB still empty, fetching direct content...')
-      const direct = await fetchFreshNewsDirect()
-      return NextResponse.json({ articles: direct })
-    }
-
-    console.log(`Returning ${articles.length} articles from DB`)
-    return NextResponse.json({ articles })
+    return NextResponse.json({ 
+      articles: articles || [], 
+      metadata: {
+        has_serp_key: !!process.env.SERP_API_KEY,
+        has_supabase_url: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
+        count: articles?.length || 0,
+        last_fetch: timeSinceLastFetch / 1000 / 60
+      }
+    })
   } catch (error) {
     console.error('CRITICAL News API Error:', error)
     const direct = await fetchFreshNewsDirect()
-    return NextResponse.json({ articles: direct, error: 'Internal server error, fallback used' })
+    return NextResponse.json({ 
+      articles: direct, 
+      metadata: { has_serp_key: !!process.env.SERP_API_KEY, fallback: true },
+      error: 'Internal server error, fallback used' 
+    })
   }
 }
 
@@ -109,16 +114,10 @@ async function refreshNewsFromSerpApi(supabase: any) {
     const rawResults = data.news_results || []
     console.log(`Fetched ${rawResults.length} raw articles from SerpAPI`)
 
-    const allowedNames = ['economic times', 'times of india', 'moneycontrol', 'ndtv', 'mint', 'livemint', 'business standard', 'financial express', 'zee business', 'cnbctv18', 'hindustan times', 'reuters', 'firstpost']
-    
+    // REMOVED FILTER FOR DEBUGGING: let's see if we get anything at all
     const processedArticles = rawResults
-      .filter((item: any) => {
-        const sourceName = (item.source || '').toLowerCase()
-        const isAllowed = allowedNames.some(allowed => sourceName.includes(allowed))
-        return isAllowed
-      })
+      .slice(0, 30) // Take first 30
       .map((item: any) => {
-        // Use published_at from SerpAPI if available, else parse relative date
         const pubAt = item.published_at ? new Date(item.published_at) : parseRelativeDate(item.date)
         return {
           title: item.title,
