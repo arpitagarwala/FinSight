@@ -65,9 +65,9 @@ export default function NewsPage() {
             validArticles.map((a: any, i) => (
               <a key={i} href={a.url} target="_blank" rel="noopener noreferrer" className="card-hover group block flex flex-col h-full">
                 {a.image && (
-                  <div className="w-full h-40 rounded-xl overflow-hidden mb-4 relative bg-[#0f0f1a]">
-                    <img src={a.image} alt={a.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-[#13131f] to-transparent"></div>
+                  <div className="w-full h-44 rounded-xl overflow-hidden mb-4 relative bg-[#0f0f1a] border border-slate-800/30">
+                    <img src={a.image} alt={a.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 opacity-90 group-hover:opacity-100" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0f] via-transparent to-transparent opacity-80"></div>
                   </div>
                 )}
                 <div className="flex flex-col flex-1">

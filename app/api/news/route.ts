@@ -91,7 +91,7 @@ async function fetchFreshNewsDirect() {
   if (!serpKey) return { articles: [], error: 'Missing API Key' }
   try {
     const response = await fetch(
-      `https://serpapi.com/search.json?engine=google&tbm=nws&q=finance+news&gl=in&hl=en&api_key=${serpKey}`,
+      `https://serpapi.com/search.json?engine=google&tbm=nws&q=indian+finance+news&gl=in&hl=en&tbs=qdr:d&api_key=${serpKey}`,
       { cache: 'no-store' }
     )
     if (!response.ok) {
@@ -121,8 +121,9 @@ async function refreshNewsFromSerpApi(supabase: any, logs: string[]) {
   }
 
   try {
+    // Added tbs=qdr:d for past 24 hours of news to ensure freshness
     const response = await fetch(
-       `https://serpapi.com/search.json?engine=google&tbm=nws&q=indian+finance+news&gl=in&api_key=${serpKey}`,
+       `https://serpapi.com/search.json?engine=google&tbm=nws&q=indian+finance+stock+market+news&gl=in&tbs=qdr:d&api_key=${serpKey}`,
       { cache: 'no-store' }
     )
     
@@ -136,8 +137,14 @@ async function refreshNewsFromSerpApi(supabase: any, logs: string[]) {
     const rawResults = data.news_results || []
     logs.push(`SerpAPI returned ${rawResults.length} articles`)
 
-    // Just take whatever we get for now to be safe
+    // Strictly filtering for FREE/LEGIT sources as requested
+    const freeSources = ['moneycontrol', 'ndtv', 'zeebiz', 'zee business', 'cnbctv18', 'reuters', 'firstpost', 'times of india', 'india today', 'hindustantimes', 'news18', 'the hindu', 'indian express', 'the quint', 'the news minute']
+    
     const processedArticles = rawResults
+      .filter((item: any) => {
+        const sourceName = (item.source || '').toLowerCase()
+        return freeSources.some(allowed => sourceName.includes(allowed))
+      })
       .slice(0, 30)
       .map((item: any) => {
         const pubAt = item.published_at ? new Date(item.published_at) : parseRelativeDate(item.date)
@@ -152,6 +159,7 @@ async function refreshNewsFromSerpApi(supabase: any, logs: string[]) {
       })
 
     if (processedArticles.length > 0) {
+      logs.push(`Inserting ${processedArticles.length} filtered free articles.`)
       const { error: upsertError } = await supabase
         .from('news')
         .upsert(processedArticles, { onConflict: 'url' })
@@ -164,7 +172,7 @@ async function refreshNewsFromSerpApi(supabase: any, logs: string[]) {
       return { success: true, count: processedArticles.length }
     }
 
-    logs.push('No articles processed after mapping.')
+    logs.push('No articles matched free sources filter.')
     return { error: 'No content found' }
 
   } catch (error: any) {
