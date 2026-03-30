@@ -91,7 +91,7 @@ async function fetchFreshNewsDirect() {
   if (!serpKey) return { articles: [], error: 'Missing API Key' }
   try {
     const response = await fetch(
-      `https://serpapi.com/search.json?engine=google_search&tbm=nws&q=finance+news&gl=in&hl=en&api_key=${serpKey}`,
+      `https://serpapi.com/search.json?engine=google&tbm=nws&q=finance+news&gl=in&hl=en&api_key=${serpKey}`,
       { cache: 'no-store' }
     )
     if (!response.ok) {
@@ -122,7 +122,7 @@ async function refreshNewsFromSerpApi(supabase: any, logs: string[]) {
 
   try {
     const response = await fetch(
-       `https://serpapi.com/search.json?engine=google_search&tbm=nws&q=indian+finance+news&gl=in&api_key=${serpKey}`,
+       `https://serpapi.com/search.json?engine=google&tbm=nws&q=indian+finance+news&gl=in&api_key=${serpKey}`,
       { cache: 'no-store' }
     )
     
