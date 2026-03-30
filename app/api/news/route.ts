@@ -58,12 +58,16 @@ export async function GET() {
         last_fetch: timeSinceLastFetch / 1000 / 60
       }
     })
-  } catch (error) {
+  } catch (error: any) {
     console.error('CRITICAL News API Error:', error)
-    const direct = await fetchFreshNewsDirect()
+    const { articles: direct, error: directError } = await fetchFreshNewsDirect()
     return NextResponse.json({ 
       articles: direct, 
-      metadata: { has_serp_key: !!process.env.SERP_API_KEY, fallback: true },
+      metadata: { 
+        has_serp_key: !!process.env.SERP_API_KEY, 
+        fallback: true,
+        fallback_error: directError
+      },
       error: 'Internal server error, fallback used' 
     })
   }
@@ -71,24 +75,29 @@ export async function GET() {
 
 async function fetchFreshNewsDirect() {
   const serpKey = process.env.SERP_API_KEY
-  if (!serpKey) return []
+  if (!serpKey) return { articles: [], error: 'Missing API Key' }
   try {
     const response = await fetch(
-      `https://serpapi.com/search.json?engine=google_search&tbm=nws&q=indian+stock+market+finance+economy+news&gl=in&hl=en&api_key=${serpKey}`,
+      `https://serpapi.com/search.json?engine=google_search&tbm=nws&q=finance+news&gl=in&hl=en&api_key=${serpKey}`,
       { cache: 'no-store' }
     )
-    if (!response.ok) return []
+    if (!response.ok) {
+      const errText = await response.text()
+      console.error('Direct Fallback SerpAPI Error:', errText)
+      return { articles: [], error: `SerpAPI Error: ${response.status} - ${errText}` }
+    }
     const data = await response.json()
-    return (data.news_results || []).slice(0, 24).map((item: any) => ({
+    const articles = (data.news_results || []).slice(0, 24).map((item: any) => ({
       title: item.title,
       description: item.snippet || '',
       url: item.link,
       image: item.thumbnail || '',
-      source: item.source || 'Google News',
+      source: item.source || 'News',
       published_at: item.published_at || parseRelativeDate(item.date).toISOString()
     }))
-  } catch {
-    return []
+    return { articles, error: null }
+  } catch (err: any) {
+    return { articles: [], error: err.message }
   }
 }
 
