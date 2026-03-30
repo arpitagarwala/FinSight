@@ -7,9 +7,10 @@ const REFRESH_THRESHOLD_MS = 60 * 60 * 1000 // 1 hour
 
 export async function GET() {
   const supabase = await createClient()
+  const logs: string[] = []
   
   try {
-    console.log('--- News Fetch Started ---')
+    logs.push('--- News Fetch Started ---')
     
     // 1. Initial check: Is the DB empty or stale?
     const { data: latestEntry, error: checkError } = await supabase
@@ -19,22 +20,30 @@ export async function GET() {
       .limit(1)
 
     if (checkError) {
-      console.error('Supabase News Check Error:', checkError)
-      // Fallback to direct SerpAPI if DB table is missing or broken
-      const fallback = await fetchFreshNewsDirect()
-      return NextResponse.json({ articles: fallback, warning: 'Database check failed, using direct fallback' })
+      logs.push(`Supabase Check Error: ${JSON.stringify(checkError)}`)
+      const { articles: fallback, error: directError } = await fetchFreshNewsDirect()
+      return NextResponse.json({ 
+        articles: fallback, 
+        metadata: { 
+          has_serp_key: !!process.env.SERP_API_KEY, 
+          fallback: true,
+          db_error: checkError,
+          direct_error: directError,
+          logs
+        } 
+      })
     }
 
     const now = Date.now()
     const lastFetchTime = latestEntry?.[0] ? new Date(latestEntry[0].created_at).getTime() : 0
     const timeSinceLastFetch = now - lastFetchTime
-
-    console.log(`Last fetch was ${Math.round(timeSinceLastFetch / 1000 / 60)} mins ago (Threshold: ${REFRESH_THRESHOLD_MS / 1000 / 60}m)`)
+    logs.push(`Last fetch: ${Math.round(timeSinceLastFetch / 1000 / 60)}m ago`)
 
     // 2. Trigger background refresh if stale or empty
+    let refreshResult: any = null
     if (timeSinceLastFetch > REFRESH_THRESHOLD_MS || !latestEntry || latestEntry.length === 0) {
-      console.log('Triggering SerpAPI Refresh...')
-      await refreshNewsFromSerpApi(supabase)
+      logs.push('Triggering Refresh from SerpAPI...')
+      refreshResult = await refreshNewsFromSerpApi(supabase, logs)
     }
 
     // 3. Final Query from DB
@@ -44,31 +53,35 @@ export async function GET() {
       .order('published_at', { ascending: false })
       .limit(48)
 
-    if (fetchError) {
-      console.error('Supabase Final Fetch Error:', fetchError)
+    if (fetchError) logs.push(`Final DB Fetch Error: ${JSON.stringify(fetchError)}`)
+
+    // Fallback if still empty
+    if (!articles || articles.length === 0) {
+      logs.push('DB empty after refresh, getting direct content...')
+      const { articles: direct, error: directError } = await fetchFreshNewsDirect()
+      return NextResponse.json({ 
+        articles: direct, 
+        metadata: { has_serp_key: !!process.env.SERP_API_KEY, fallback: true, direct_error: directError, refresh_result: refreshResult, logs } 
+      })
     }
 
-    // If DB is still empty (e.g., first run and refresh is still processing or failed), return direct fallback
     return NextResponse.json({ 
-      articles: articles || [], 
+      articles, 
       metadata: {
         has_serp_key: !!process.env.SERP_API_KEY,
         has_supabase_url: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
         count: articles?.length || 0,
-        last_fetch: timeSinceLastFetch / 1000 / 60
+        last_fetch: Math.round(timeSinceLastFetch / 1000 / 60),
+        logs
       }
     })
   } catch (error: any) {
-    console.error('CRITICAL News API Error:', error)
+    logs.push(`CRITICAL ERROR: ${error.message}`)
     const { articles: direct, error: directError } = await fetchFreshNewsDirect()
     return NextResponse.json({ 
       articles: direct, 
-      metadata: { 
-        has_serp_key: !!process.env.SERP_API_KEY, 
-        fallback: true,
-        fallback_error: directError
-      },
-      error: 'Internal server error, fallback used' 
+      metadata: { has_serp_key: !!process.env.SERP_API_KEY, fallback: true, logs, last_error: error.message },
+      error: 'See logs in metadata' 
     })
   }
 }
@@ -83,7 +96,6 @@ async function fetchFreshNewsDirect() {
     )
     if (!response.ok) {
       const errText = await response.text()
-      console.error('Direct Fallback SerpAPI Error:', errText)
       return { articles: [], error: `SerpAPI Error: ${response.status} - ${errText}` }
     }
     const data = await response.json()
@@ -101,31 +113,32 @@ async function fetchFreshNewsDirect() {
   }
 }
 
-async function refreshNewsFromSerpApi(supabase: any) {
+async function refreshNewsFromSerpApi(supabase: any, logs: string[]) {
   const serpKey = process.env.SERP_API_KEY
   if (!serpKey) {
-    console.warn('MISSING SERP_API_KEY')
-    return
+    logs.push('Refresh Error: Missing SerpAPI Key')
+    return { error: 'Missing Key' }
   }
 
   try {
     const response = await fetch(
-       `https://serpapi.com/search.json?engine=google_search&tbm=nws&q=indian+stock+market+finance+economy+news&gl=in&hl=en&api_key=${serpKey}`,
+       `https://serpapi.com/search.json?engine=google_search&tbm=nws&q=indian+finance+news&gl=in&api_key=${serpKey}`,
       { cache: 'no-store' }
     )
     
     if (!response.ok) {
-      console.error('SerpAPI Error:', await response.text())
-      return
+      const errText = await response.text()
+      logs.push(`SerpAPI Fetch Failed: ${response.status} - ${errText}`)
+      return { error: `SerpAPI ${response.status}`, details: errText }
     }
 
     const data = await response.json()
     const rawResults = data.news_results || []
-    console.log(`Fetched ${rawResults.length} raw articles from SerpAPI`)
+    logs.push(`SerpAPI returned ${rawResults.length} articles`)
 
-    // REMOVED FILTER FOR DEBUGGING: let's see if we get anything at all
+    // Just take whatever we get for now to be safe
     const processedArticles = rawResults
-      .slice(0, 30) // Take first 30
+      .slice(0, 30)
       .map((item: any) => {
         const pubAt = item.published_at ? new Date(item.published_at) : parseRelativeDate(item.date)
         return {
@@ -138,26 +151,25 @@ async function refreshNewsFromSerpApi(supabase: any) {
         }
       })
 
-    console.log(`Filtered down to ${processedArticles.length} valid articles`)
-
     if (processedArticles.length > 0) {
       const { error: upsertError } = await supabase
         .from('news')
         .upsert(processedArticles, { onConflict: 'url' })
       
       if (upsertError) {
-        console.error('UPSERT FAILED:', upsertError)
-      } else {
-        console.log('Successfully upserted news into database')
+        logs.push(`Supabase Upsert Error: ${JSON.stringify(upsertError)}`)
+        return { error: 'Upsert failed', details: upsertError }
       }
+      logs.push('Database successfully updated.')
+      return { success: true, count: processedArticles.length }
     }
 
-    const sixMonthsAgo = new Date()
-    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6)
-    await supabase.from('news').delete().lt('published_at', sixMonthsAgo.toISOString())
+    logs.push('No articles processed after mapping.')
+    return { error: 'No content found' }
 
-  } catch (error) {
-    console.error('Refresh Execution Error:', error)
+  } catch (error: any) {
+    logs.push(`Refresh Error: ${error.message}`)
+    return { error: error.message }
   }
 }
 
