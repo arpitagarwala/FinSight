@@ -39,8 +39,8 @@ export default function DashboardPage() {
     setUpcomingBills(bills)
     setRecent(txs.slice(0, 6))
 
-    // Stats
-    const thisMonthTxs = txs.filter(t => t.date >= start && t.date <= end)
+    // Stats (Exclude 'Imported' category from analytics as per user request)
+    const thisMonthTxs = txs.filter(t => t.date >= start && t.date <= end && t.category !== 'Imported')
     const income = thisMonthTxs.filter(t => t.type === 'income').reduce((s, t) => s + Number(t.amount), 0)
     const expenses = thisMonthTxs.filter(t => t.type === 'expense').reduce((s, t) => s + Number(t.amount), 0)
     setStats({ income, expenses, netWorth: income - expenses, savings: income > 0 ? ((income - expenses) / income) * 100 : 0 })
@@ -56,7 +56,7 @@ export default function DashboardPage() {
     const months: any[] = []
     for (let i = 5; i >= 0; i--) {
       const { start: ms, end: me } = getMonthRange(-i)
-      const mTxs = txs.filter(t => t.date >= ms && t.date <= me)
+      const mTxs = txs.filter(t => t.date >= ms && t.date <= me && t.category !== 'Imported')
       const mLabel = new Date(ms).toLocaleString('en-IN', { month: 'short' })
       months.push({
         month: mLabel,

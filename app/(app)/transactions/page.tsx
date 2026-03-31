@@ -5,6 +5,8 @@ import { useEffect, useState, useCallback } from 'react'
 import { Plus, Search, Filter, Download, Trash2, Edit, X, Loader2, ArrowUpCircle, ArrowDownCircle } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { formatCurrency, formatDate, EXPENSE_CATEGORIES, INCOME_CATEGORIES, CATEGORY_COLORS } from '@/lib/utils'
+import StatementAnalyzerModal from '@/components/transactions/StatementAnalyzerModal'
+import { Sparkles } from 'lucide-react'
 
 type Tx = { id: string; amount: number; type: string; category: string; description: string; date: string }
 
@@ -18,11 +20,15 @@ export default function TransactionsPage() {
   const [typeFilter, setTypeFilter] = useState('all')
   const [form, setForm] = useState({ amount: '', type: 'expense', category: 'Food & Dining', description: '', date: new Date().toISOString().split('T')[0] })
   const [saving, setSaving] = useState(false)
+  const [showAnalyzer, setShowAnalyzer] = useState(false)
 
   const load = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
-    const { data } = await supabase.from('transactions').select('*').eq('user_id', user.id).order('date', { ascending: false })
+    const { data } = await supabase.from('transactions')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('date', { ascending: false })
     setTxs(data ?? [])
     setLoading(false)
   }, [])
@@ -84,6 +90,12 @@ export default function TransactionsPage() {
           <p className="text-slate-500 text-sm">{txs.length} total transactions</p>
         </div>
         <div className="flex items-center gap-2">
+          <button 
+            onClick={() => setShowAnalyzer(true)} 
+            className="btn-secondary border-indigo-500/30 text-indigo-400 hover:bg-indigo-500/10"
+          >
+            <Sparkles size={16} /> Magic Import
+          </button>
           <button onClick={exportCSV} className="btn-secondary"><Download size={15} /> CSV</button>
           <button onClick={() => { setEditing(null); setForm({ amount: '', type: 'expense', category: 'Food & Dining', description: '', date: new Date().toISOString().split('T')[0] }); setShowModal(true) }} className="btn-primary"><Plus size={16} /> Add</button>
         </div>
@@ -196,6 +208,15 @@ export default function TransactionsPage() {
           </div>
         </div>
       )}
+      {/* Analyzer Modal */}
+      <StatementAnalyzerModal 
+        isOpen={showAnalyzer} 
+        onClose={() => setShowAnalyzer(false)} 
+        onComplete={() => {
+          load()
+          setShowAnalyzer(false)
+        }} 
+      />
     </div>
   )
 }
