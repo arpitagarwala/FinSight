@@ -29,7 +29,7 @@ export default function HealthScorePage() {
       supabase.from('debts').select('*').eq('user_id', user.id),
       supabase.from('bills').select('*').eq('user_id', user.id),
     ])
-    const txs = (txRes.data ?? []).filter(t => t.category !== 'Imported')
+    const txs = txRes.data ?? []
     const goals = goalRes.data ?? []
     const debts = debtRes.data ?? []
     const bills = billRes.data ?? []
