@@ -109,7 +109,7 @@ export default function StatementAnalyzerModal({ isOpen, onClose, onComplete }: 
         onComplete()
         onClose()
         reset()
-      }, 2000)
+      }, 2500) // Slightly longer to allow DB to settle
     } catch (err: any) {
       setError(`Save failed: ${err.message}`)
     } finally {
@@ -314,7 +314,7 @@ export default function StatementAnalyzerModal({ isOpen, onClose, onComplete }: 
                 disabled={isSaving || isCleaning}
               >
                 {isSaving ? <Loader2 className="animate-spin" size={16} /> : <Save size={16} />}
-                Import {data?.transactions.length} Txns
+                Import {data?.transactions.length} Transactions
               </button>
             </div>
           </div>
