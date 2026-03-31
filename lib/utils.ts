@@ -31,6 +31,22 @@ export function getMonthRange(monthOffset = 0) {
   }
 }
 
+export function getFinancialYearRange(date: Date = new Date()) {
+  const year = date.getFullYear()
+  const month = date.getMonth() // 0-indexed (April is 3)
+  
+  // If before April, the FY started last year
+  const fyStartYear = month < 3 ? year - 1 : year
+  const start = new Date(fyStartYear, 3, 1) // April 1st
+  const end = new Date(fyStartYear + 1, 2, 31) // March 31st next year
+  
+  return {
+    start: start.toISOString().split('T')[0],
+    end: end.toISOString().split('T')[0],
+    label: `FY ${fyStartYear}-${(fyStartYear + 1).toString().slice(2)}`
+  }
+}
+
 export const EXPENSE_CATEGORIES = [
   'Food & Dining',
   'Transport',

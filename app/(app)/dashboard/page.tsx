@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic'
 import { useEffect, useState } from 'react'
 import { TrendingUp, TrendingDown, DollarSign, Target, Brain, ArrowUpRight, ArrowDownRight, Loader2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import { formatCurrency, getMonthRange, CATEGORY_COLORS } from '@/lib/utils'
+import { formatCurrency, getMonthRange, CATEGORY_COLORS, getFinancialYearRange } from '@/lib/utils'
 import { AreaChart, Area, PieChart, Pie, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import Link from 'next/link'
 
@@ -12,6 +12,7 @@ export default function DashboardPage() {
   const supabase = createClient()
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState({ income: 0, expenses: 0, netWorth: 0, savings: 0 })
+  const [fyLabel, setFyLabel] = useState('')
   const [recent, setRecent] = useState<any[]>([])
   const [categoryData, setCategoryData] = useState<any[]>([])
   const [monthlyData, setMonthlyData] = useState<any[]>([])
@@ -39,25 +40,41 @@ export default function DashboardPage() {
     setUpcomingBills(bills)
     setRecent(txs.slice(0, 6))
 
-    // Stats (Include all transactions for cash flow accuracy)
-    const thisMonthTxs = txs.filter(t => t.date >= start && t.date <= end)
-    const income = thisMonthTxs.filter(t => t.type === 'income').reduce((s, t) => s + Number(t.amount), 0)
-    const expenses = thisMonthTxs.filter(t => t.type === 'expense').reduce((s, t) => s + Number(t.amount), 0)
+    // Determine target Financial Year (Smart Lookback)
+    let fy = getFinancialYearRange()
+    const currentFYTxs = txs.filter(t => t.date >= fy.start && t.date <= fy.end)
+    
+    // If current FY is empty, find the latest year with data
+    if (currentFYTxs.length === 0 && txs.length > 0) {
+      const latestDate = new Date(txs[0].date)
+      fy = getFinancialYearRange(latestDate)
+    }
+    setFyLabel(fy.label)
+
+    // Stats (Include all transactions for cash flow accuracy in the selected FY)
+    const fyTxs = txs.filter(t => t.date >= fy.start && t.date <= fy.end)
+    const income = fyTxs.filter(t => t.type === 'income').reduce((s, t) => s + Number(t.amount), 0)
+    const expenses = fyTxs.filter(t => t.type === 'expense').reduce((s, t) => s + Number(t.amount), 0)
     setStats({ income, expenses, netWorth: income - expenses, savings: income > 0 ? ((income - expenses) / income) * 100 : 0 })
 
     // Category breakdown (Exclude 'Imported' from the pie chart)
     const cats: Record<string, number> = {}
-    thisMonthTxs.filter(t => t.type === 'expense' && t.category !== 'Imported').forEach(t => {
+    fyTxs.filter(t => t.type === 'expense' && t.category !== 'Imported').forEach(t => {
       cats[t.category] = (cats[t.category] || 0) + Number(t.amount)
     })
     setCategoryData(Object.entries(cats).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value).slice(0, 6))
 
-    // Monthly trend (last 6 months)
+    // Monthly trend (6 months ending at the end of the selected FY or current date)
+    const trendEndDate = new Date(fy.end) < new Date() ? new Date(fy.end) : new Date()
     const months: any[] = []
     for (let i = 5; i >= 0; i--) {
-      const { start: ms, end: me } = getMonthRange(-i)
-      const mTxs = txs.filter(t => t.date >= ms && t.date <= me)
-      const mLabel = new Date(ms).toLocaleString('en-IN', { month: 'short' })
+      const ms = new Date(trendEndDate.getFullYear(), trendEndDate.getMonth() - i, 1)
+      const me = new Date(trendEndDate.getFullYear(), trendEndDate.getMonth() - i + 1, 0)
+      const rangeStart = ms.toISOString().split('T')[0]
+      const rangeEnd = me.toISOString().split('T')[0]
+      
+      const mTxs = txs.filter(t => t.date >= rangeStart && t.date <= rangeEnd)
+      const mLabel = ms.toLocaleString('en-IN', { month: 'short' })
       months.push({
         month: mLabel,
         income: mTxs.filter(t => t.type === 'income').reduce((s, t) => s + Number(t.amount), 0),
@@ -115,7 +132,7 @@ export default function DashboardPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white">{greeting}, {userName}! 👋</h1>
-          <p className="text-slate-500 text-sm mt-1">Here's your financial snapshot for {new Date().toLocaleString('en-IN', { month: 'long', year: 'numeric' })}</p>
+          <p className="text-slate-500 text-sm mt-1">Here's your financial snapshot for {fyLabel}</p>
         </div>
         <Link href="/transactions" className="btn-primary hidden sm:flex">Add Transaction</Link>
       </div>
@@ -140,7 +157,7 @@ export default function DashboardPage() {
             </div>
             <div className={`flex items-center gap-1 text-xs ${s.positive ? 'text-emerald-400' : 'text-red-400'}`}>
               {s.positive ? <ArrowUpRight size={13} /> : <ArrowDownRight size={13} />}
-              <span>This month</span>
+              <span>This FY</span>
             </div>
           </div>
         ))}
