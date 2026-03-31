@@ -17,24 +17,26 @@ export async function distillTransactions(transactions: Transaction[], apiKey: s
 
   const rawDescriptions = [...new Set(transactions.map(t => t.description))];
   
+  // Use current, stable free models from OpenRouter (NVIDIA Nemotron Nano is primary)
   const models = [
-    "mistralai/mistral-7b-instruct:free",
+    "nvidia/nemotron-nano-9b-v2:free",
     "google/gemini-2.0-flash-lite-preview-02-05:free",
-    "meta-llama/llama-3.1-8b-instruct:free"
+    "qwen/qwen-2-7b-instruct:free",
+    "google/gemini-flash-1.5-8b:free"
   ];
 
   const prompt = `
-    Distill these Indian bank strings into clean merchant names (e.g. Zomato, Amazon, Uber). 
-    Remove all bank codes and technical noise. Respond ONLY with a JSON mapping.
+    Distill these Indian bank strings into clean merchant names (e.g. Zomato, Amazon, Uber, Flipkart). 
+    Remove all bank/technical noise. Respond ONLY with a JSON mapping.
     
     LIST:
-    ${JSON.stringify(rawDescriptions)}
+    ${JSON.stringify(rawDescriptions.slice(0, 50))}
   `;
 
   for (const model of models) {
     try {
       const controller = new AbortController();
-      const id = setTimeout(() => controller.abort(), 8000);
+      const id = setTimeout(() => controller.abort(), 10000);
 
       const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
         method: "POST",
@@ -47,7 +49,8 @@ export async function distillTransactions(transactions: Transaction[], apiKey: s
         },
         body: JSON.stringify({
           "model": model,
-          "messages": [{ "role": "user", "content": prompt }]
+          "messages": [{ "role": "user", "content": prompt }],
+          "temperature": 0.1
         })
       });
       clearTimeout(id);
@@ -60,6 +63,12 @@ export async function distillTransactions(transactions: Transaction[], apiKey: s
       let content = result.choices[0].message.content;
       if (content.includes("```json")) content = content.split("```json")[1].split("```")[0].trim();
       else if (content.includes("```")) content = content.split("```")[1].split("```")[0].trim();
+      else {
+        // Find first { and last }
+        const start = content.indexOf('{');
+        const end = content.lastIndexOf('}');
+        if (start !== -1 && end !== -1) content = content.substring(start, end + 1);
+      }
       
       const mapping = JSON.parse(content);
       

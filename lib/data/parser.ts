@@ -20,12 +20,56 @@ export interface ExtractionResult {
   bank: string;
 }
 
+/**
+ * Normalizes various Indian bank date formats to YYYY-MM-DD
+ */
+function normalizeDate(dateStr: string): string {
+  if (!dateStr) return new Date().toISOString().split('T')[0];
+  
+  // Clean up the string
+  const cleanStr = dateStr.replace(/,/g, '').trim();
+  
+  // Common format: DD/MM/YY or DD/MM/YYYY
+  if (cleanStr.includes('/')) {
+    const parts = cleanStr.split('/');
+    if (parts.length === 3) {
+      let [d, m, y] = parts;
+      if (y.length === 2) y = '20' + y;
+      return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+    }
+  }
+
+  // Common format: DD-MMM-YY (e.g., 21-May-24)
+  if (cleanStr.includes('-')) {
+    const months: Record<string, string> = {
+      jan: '01', feb: '02', mar: '03', apr: '04', may: '05', jun: '06',
+      jul: '07', aug: '08', sep: '09', oct: '10', nov: '11', dec: '12'
+    };
+    const parts = cleanStr.split('-');
+    if (parts.length === 3) {
+      let [d, m, y] = parts;
+      const monthNum = months[m.toLowerCase().substring(0, 3)];
+      if (monthNum) {
+        if (y.length === 2) y = '20' + y;
+        return `${y}-${monthNum}-${d.padStart(2, '0')}`;
+      }
+    }
+  }
+
+  // Fallback to JS Date if possible
+  try {
+    const d = new Date(cleanStr);
+    if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
+  } catch (e) {}
+
+  return new Date().toISOString().split('T')[0];
+}
+
 export class SpatialParser {
   private pdfjs: any = null;
 
   private async loadPdfjs() {
     if (this.pdfjs) return this.pdfjs;
-    // Dynamic import to avoid SSR errors like "DOMMatrix is not defined"
     const pdfjs = await import('pdfjs-dist');
     if (typeof window !== 'undefined' && !pdfjs.GlobalWorkerOptions.workerSrc) {
       pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
@@ -61,8 +105,6 @@ export class SpatialParser {
       if (textContent.items.length === 0) continue;
 
       const rows = this.clusterByY(textContent.items as any[]);
-      
-      // Restore identifyTable logic from prototype
       const { headerRowIndex, tableData, bank } = this.identifyTable(rows);
       if (bank !== 'Generic') detectedBank = bank;
 
@@ -104,8 +146,8 @@ export class SpatialParser {
       if (!found) rows.set(y, [item]);
     });
     return Array.from(rows.entries())
-      .sort((a, b) => b[0] - a[0]) // Sort by Y descending (Top-to-Bottom)
-      .map(entry => entry[1].sort((a, b) => a.transform[4] - b.transform[4])); // Sort items in row by X
+      .sort((a, b) => b[0] - a[0])
+      .map(entry => entry[1].sort((a, b) => a.transform[4] - b.transform[4]));
   }
 
   private identifyTable(rows: any[][]) {
@@ -153,7 +195,8 @@ export class SpatialParser {
     const fullText = items.map(i => i.str).join(' ');
     
     const dateMatch = fullText.match(/\d{1,2}[\/\-\. ](?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|\d{1,2})[\/\-\. ](?:\d{2,4})/i);
-    const date = dateMatch ? dateMatch[0] : '';
+    const dateStr = dateMatch ? dateMatch[0] : '';
+    const date = normalizeDate(dateStr);
 
     let debit = 0;
     let credit = 0;
@@ -186,7 +229,7 @@ export class SpatialParser {
 
     const type = credit > 0 ? 'credit' : 'debit';
     const amount = credit > 0 ? credit : debit;
-    const description = fullText.replace(date, '').replace(/[0-9,]+\.[0-9]{2}/g, '').trim();
+    const description = fullText.replace(dateStr, '').replace(/[0-9,]+\.[0-9]{2}/g, '').trim();
 
     return {
       date,
