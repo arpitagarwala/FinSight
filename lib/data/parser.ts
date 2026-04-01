@@ -97,6 +97,7 @@ export class SpatialParser {
 
     let allTransactions: Transaction[] = [];
     let detectedBank = 'Generic';
+    let foundHeader = false;
 
     for (let i = 1; i <= pdf.numPages; i++) {
       const page = await pdf.getPage(i);
@@ -109,7 +110,13 @@ export class SpatialParser {
       if (bank !== 'Generic') detectedBank = bank;
 
       if (headerRowIndex !== -1) {
+          // Header found on this page – extract rows after the header
+          foundHeader = true;
           const pageTransactions = this.extractTransactions(tableData);
+          allTransactions = [...allTransactions, ...pageTransactions];
+      } else if (foundHeader) {
+          // Continuation page with no header – treat ALL rows as potential data
+          const pageTransactions = this.extractTransactions(rows);
           allTransactions = [...allTransactions, ...pageTransactions];
       }
     }

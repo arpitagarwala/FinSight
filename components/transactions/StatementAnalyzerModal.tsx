@@ -33,6 +33,7 @@ export default function StatementAnalyzerModal({ isOpen, onClose, onComplete }: 
   const [useClean, setUseClean] = useState(false)
   
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const fileRef = useRef<File | null>(null)
   const supabase = createClient()
 
   const reset = () => {
@@ -43,11 +44,13 @@ export default function StatementAnalyzerModal({ isOpen, onClose, onComplete }: 
     setPassword('')
     setNeedPassword(false)
     setUseClean(false)
+    fileRef.current = null
   }
 
   const handleFile = async (file: File) => {
     setIsProcessing(true)
     setError(null)
+    fileRef.current = file
     try {
       const buffer = await file.arrayBuffer()
       const parser = new SpatialParser()
@@ -196,7 +199,7 @@ export default function StatementAnalyzerModal({ isOpen, onClose, onComplete }: 
                                 className="input" 
                                 placeholder="Enter PDF password..."
                             />
-                            <button onClick={() => fileInputRef.current?.files?.[0] && handleFile(fileInputRef.current.files[0])} className="btn-primary">
+                            <button onClick={() => fileRef.current && handleFile(fileRef.current)} className="btn-primary">
                                 Unlock
                             </button>
                         </div>
