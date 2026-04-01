@@ -48,12 +48,17 @@ export async function distillTransactions(transactions: Transaction[], openRoute
 
 async function callAI(descriptions: string[], url: string, key: string, model: string) {
   const prompt = `
-    Distill these messy Indian bank strings into clean, professional merchant names (e.g. Zomato, Amazon, Uber, Flipkart, Reliance Fresh). 
+    Distill these messy Indian bank strings into clean, professional merchant or person names.
     
     RULES:
-    1. Remove all bank/technical noise, UPI IDs, and settlement codes (like .RZP or numbers).
-    2. Respond ONLY with a valid JSON object where keys are original strings and values are clean names.
-    3. Stay extremely professional and concise.
+    1. Extract ONLY the core merchant name or person's name.
+    2. Remove all transaction types (e.g., IMPS, NEFT, UPI, IFT, ACH, CASH DEPOSIT, RTGS, NACH).
+    3. Remove all reference numbers, dates, phone numbers, and bank IDs (e.g., @okicici, @paytm, @ybl, .RZP).
+    4. If it's a person (e.g., 'UPI-RADHIKA AGARWALA-63765'), return just 'Radhika Agarwala'.
+    5. If it's a merchant (e.g., 'UPI-ZOMATO-ZOMATO.ORDER' or 'ZOMATO LTD'), return just 'Zomato'.
+    6. Simplify terms like 'CREDIT INTEREST CAPITALISED' to just 'Interest'.
+    7. Format the name using standard Title Case (e.g., 'Billionbrains Garage', 'Amazon').
+    8. Respond ONLY with a valid JSON object where keys are the original exact strings and values are the clean names. Do NOT include markdown formatting or extra text.
     
     LIST:
     ${JSON.stringify(descriptions.slice(0, 50))}

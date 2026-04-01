@@ -150,12 +150,12 @@ export default function TransactionsPage() {
                   <p className="text-sm font-medium text-white truncate">{tx.description || tx.category}</p>
                   <p className="text-xs text-slate-500">{tx.category} · {formatDate(tx.date)}</p>
                 </div>
-                <span className={`text-sm font-bold ${tx.type === 'income' ? 'text-emerald-400' : 'text-red-400'}`}>
+                <span className={`text-sm flex-shrink-0 font-bold ${tx.type === 'income' ? 'text-emerald-400' : 'text-red-400'}`}>
                   {tx.type === 'income' ? '+' : '-'}{formatCurrency(tx.amount)}
                 </span>
-                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button onClick={() => openEdit(tx)} className="p-1.5 rounded-lg hover:bg-indigo-500/20 text-slate-500 hover:text-indigo-400 transition-colors"><Edit size={14} /></button>
-                  <button onClick={() => handleDelete(tx.id)} className="p-1.5 rounded-lg hover:bg-red-500/20 text-slate-500 hover:text-red-400 transition-colors"><Trash2 size={14} /></button>
+                <div className="flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity flex-shrink-0">
+                  <button onClick={() => openEdit(tx)} className="p-1.5 rounded-lg hover:bg-indigo-500/20 text-slate-500 hover:text-indigo-400 transition-colors"><Edit size={16} /></button>
+                  <button onClick={() => handleDelete(tx.id)} className="p-1.5 rounded-lg hover:bg-red-500/20 text-slate-500 hover:text-red-400 transition-colors"><Trash2 size={16} /></button>
                 </div>
               </div>
             ))}

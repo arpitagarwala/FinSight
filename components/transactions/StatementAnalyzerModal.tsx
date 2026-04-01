@@ -243,25 +243,25 @@ export default function StatementAnalyzerModal({ isOpen, onClose, onComplete }: 
                   <div className="overflow-x-auto">
                     <table className="w-full text-left text-sm">
                       <thead>
-                        <tr className="bg-[#1a1a2e] text-slate-400 border-b border-[#1e1e2e]">
-                          <th className="px-4 py-3 font-semibold">Date</th>
-                          <th className="px-4 py-3 font-semibold">Description</th>
-                          <th className="px-4 py-3 font-semibold">Category</th>
-                          <th className="px-4 py-3 font-semibold text-right">Amount</th>
+                        <tr className="bg-[#1a1a2e] text-slate-400 border-b border-[#1e1e2e] text-left text-sm">
+                          <th className="px-4 py-3 font-semibold whitespace-nowrap">Date</th>
+                          <th className="px-4 py-3 font-semibold whitespace-nowrap">Description</th>
+                          <th className="px-4 py-3 font-semibold whitespace-nowrap text-right">Balance</th>
+                          <th className="px-4 py-3 font-semibold whitespace-nowrap text-right">Amount</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-[#1e1e2e]">
                         {data.transactions.slice(0, 100).map((t, idx) => (
                           <tr key={idx} className="hover:bg-white/5 transition-colors">
-                            <td className="px-4 py-3 text-slate-400 font-mono text-xs">{t.date}</td>
-                            <td className="px-4 py-3">
+                            <td className="px-4 py-3 text-slate-400 font-mono text-xs whitespace-nowrap">{t.date}</td>
+                            <td className="px-4 py-3 whitespace-nowrap">
                               <p className="text-white font-medium truncate max-w-[200px]">{t.cleanDescription || t.description}</p>
                               {useClean && <span className="text-[8px] text-indigo-400 uppercase font-bold flex items-center gap-1"><Sparkles size={8} /> AI Cleaned</span>}
                             </td>
-                            <td className="px-4 py-3">
-                              <span className="badge badge-purple text-[10px]">{t.category}</span>
+                            <td className="px-4 py-3 whitespace-nowrap text-right text-slate-400 font-mono text-sm">
+                              {t.balance > 0 ? formatCurrency(t.balance) : '-'}
                             </td>
-                            <td className={`px-4 py-3 text-right font-bold ${t.type === 'credit' ? 'text-emerald-400' : 'text-red-400'}`}>
+                            <td className={`px-4 py-3 text-right font-bold whitespace-nowrap ${t.type === 'credit' ? 'text-emerald-400' : 'text-red-400'}`}>
                               {t.type === 'credit' ? '+' : '-'}{formatCurrency(t.amount)}
                             </td>
                           </tr>
