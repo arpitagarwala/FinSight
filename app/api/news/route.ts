@@ -206,6 +206,10 @@ function parseRelativeDate(dateStr: string): Date {
   if (!dateStr) return new Date()
   const now = new Date()
   const lower = dateStr.toLowerCase().trim()
+  
+  if (lower === 'just now') return now
+  if (lower === 'yesterday') return new Date(now.getTime() - 24 * 60 * 60 * 1000)
+  
   const match = lower.match(/(\d+)\s+(minute|hour|day|week|month)s?\s+ago/)
   if (!match) return now
   const num = parseInt(match[1], 10)

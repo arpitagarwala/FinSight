@@ -6,11 +6,13 @@ import { usePathname, useRouter } from 'next/navigation'
 import {
   LayoutDashboard, ArrowLeftRight, Target, PiggyBank, CreditCard,
   FileText, Calculator, TrendingUp, Bell, Brain, BarChart2,
-  Newspaper, Settings, LogOut, TrendingUpIcon, Menu, X, ChevronRight
+  Newspaper, Settings, LogOut, TrendingUpIcon, Menu, X, ChevronRight,
+  User, Mail, MessageSquare, ExternalLink, Camera
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { FilterProvider } from '@/lib/context/FilterContext'
 import DateRangeSelector from '@/components/ui/DateRangeSelector'
+import { motion, AnimatePresence } from 'framer-motion'
 
 
 const navItems = [
@@ -35,16 +37,33 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const supabase = createClient()
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [userName, setUserName] = useState('')
   const [userEmail, setUserEmail] = useState('')
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    async function loadUser() {
+      const { data: { user } } = await supabase.auth.getUser()
       if (user) {
         setUserEmail(user.email ?? '')
-        setUserName(user.user_metadata?.full_name || user.email?.split('@')[0] || 'User')
+        
+        // Fetch full profile including avatar
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('name, avatar_url')
+          .eq('id', user.id)
+          .single()
+        
+        if (profile) {
+          setUserName(profile.name || user.email?.split('@')[0] || 'User')
+          setAvatarUrl(profile.avatar_url)
+        } else {
+          setUserName(user.user_metadata?.full_name || user.email?.split('@')[0] || 'User')
+        }
       }
-    })
+    }
+    loadUser()
   }, [])
 
   async function handleLogout() {
@@ -84,42 +103,73 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         })}
       </nav>
 
-      {/* Bottom: Settings, Contact, User */}
-      <div className="p-3 border-t border-[#1e1e2e] space-y-1">
-        <Link href="/settings" className={pathname === '/settings' ? 'sidebar-link-active' : 'sidebar-link'}>
-          <Settings size={17} /><span>Settings</span>
-        </Link>
-
-        <div className="p-4 border-t border-[#1e1e2e] space-y-1">
-          <p className="px-3 text-[10px] font-bold tracking-wider text-slate-500 uppercase mb-2">Connect with Developer</p>
-          <a href="mailto:arpitagarwalms@gmail.com" className="flex items-center gap-3 px-3 py-2 text-sm text-slate-400 hover:text-indigo-400 hover:bg-indigo-500/10 rounded-lg transition-colors">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
-            Email Feedback
-          </a>
-          <a href="https://wa.me/919957414146?text=Hi%20Arpit,%20I%20saw%20your%20FinSight%20App%20and%20wanted%20to%20connect!" target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 px-3 py-2 text-sm text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/10 rounded-lg transition-colors">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
-            WhatsApp
-          </a>
-
-          <div className="mt-4 pt-4 border-t border-[#1e1e2e]">
-            <button onClick={handleLogout} className="w-full flex items-center gap-3 px-3 py-2 text-sm text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors mb-2">
-              <LogOut size={18} />
-              Sign Out
-            </button>
-            <div className="flex items-center gap-3 px-3 py-2">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center text-white font-bold shadow-lg shadow-indigo-500/20">
-                {userName.charAt(0).toUpperCase()}
+      {/* Bottom: User Section with Popover */}
+      <div className="p-4 border-t border-[#1e1e2e] mt-auto relative">
+        <AnimatePresence>
+          {userMenuOpen && (
+            <motion.div
+              initial={{ opacity: 0, y: 10, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 10, scale: 0.95 }}
+              className="absolute bottom-full left-4 right-4 mb-2 bg-[#0f0f1a] border border-[#1e1e2e] rounded-2xl shadow-2xl overflow-hidden z-50 py-2"
+            >
+              <div className="px-4 py-2 border-b border-[#1e1e2e] mb-1">
+                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Account</p>
               </div>
-              <div className="overflow-hidden">
-                <p className="text-sm font-medium text-white truncate">{userName}</p>
-                <p className="text-xs text-amber-500 font-medium">Premium Plan</p>
-              </div>
-            </div>
+              
+              <Link href="/settings" 
+                onClick={() => setUserMenuOpen(false)}
+                className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-300 hover:text-white hover:bg-white/5 transition-colors">
+                <Settings size={16} className="text-indigo-400" />
+                Settings
+              </Link>
+              
+              <div className="h-px bg-[#1e1e2e] my-1" />
+              <p className="px-4 py-1.5 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Developer</p>
+              
+              <a href="mailto:arpitagarwalms@gmail.com" 
+                className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-300 hover:text-indigo-400 hover:bg-indigo-500/10 transition-colors">
+                <Mail size={16} />
+                Email Feedback
+              </a>
+              <a href="https://wa.me/919957414146" target="_blank" rel="noopener noreferrer"
+                className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-300 hover:text-emerald-400 hover:bg-emerald-500/10 transition-colors">
+                <MessageSquare size={16} />
+                WhatsApp Connect
+              </a>
+
+              <div className="h-px bg-[#1e1e2e] my-1" />
+              
+              <button 
+                onClick={handleLogout}
+                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors">
+                <LogOut size={16} />
+                Sign Out
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <button 
+          onClick={() => setUserMenuOpen(!userMenuOpen)}
+          className={`w-full flex items-center gap-3 p-3 rounded-2xl transition-all ${userMenuOpen ? 'bg-white/5 border-white/10 ring-1 ring-white/10' : 'hover:bg-white/5'}`}
+        >
+          <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center text-white font-bold shadow-lg shadow-indigo-500/20 overflow-hidden flex-shrink-0">
+            {avatarUrl ? (
+              <img src={avatarUrl} alt={userName} className="w-full h-full object-cover" />
+            ) : (
+              userName.charAt(0).toUpperCase()
+            )}
           </div>
-        </div>
+          <div className="text-left overflow-hidden">
+            <p className="text-sm font-bold text-white truncate">{userName}</p>
+            <p className="text-[10px] text-indigo-400 font-bold uppercase tracking-tight">Premium Member</p>
+          </div>
+          <ChevronRight size={14} className={`ml-auto text-slate-500 transition-transform ${userMenuOpen ? 'rotate-90' : '-rotate-90'}`} />
+        </button>
       </div>
     </div>
-  )
+  );
 
   return (
     <FilterProvider>
@@ -150,8 +200,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               <button onClick={() => setSidebarOpen(true)} className="text-slate-400 hover:text-white">
                 <Menu size={22} />
               </button>
-              <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center text-white font-bold shadow-lg shadow-indigo-500/20">
-                {userName ? userName.charAt(0).toUpperCase() : ''}
+              <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center text-white font-bold shadow-lg shadow-indigo-500/20 overflow-hidden">
+                {avatarUrl ? (
+                  <img src={avatarUrl} alt={userName} className="w-full h-full object-cover" />
+                ) : (
+                  userName ? userName.charAt(0).toUpperCase() : ''
+                )}
               </div>
             </div>
             <DateRangeSelector />

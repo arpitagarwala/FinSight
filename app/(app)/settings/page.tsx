@@ -1,8 +1,8 @@
 'use client'
 export const dynamic = 'force-dynamic'
 
-import { useEffect, useState } from 'react'
-import { Loader2, Save, LogOut, User, Key } from 'lucide-react'
+import { useEffect, useState, useRef } from 'react'
+import { Loader2, Save, LogOut, User, Key, Camera, Trash2, ShieldCheck } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 
@@ -12,18 +12,119 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState({ name: '', monthly_income: '', currency: 'INR', groq_api_key: '', gemini_api_key: '' })
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
+  const [uploading, setUploading] = useState(false)
   const [saved, setSaved] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
       const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single()
-      if (data) setForm(f => ({ ...f, name: data.name || '', monthly_income: String(data.monthly_income || ''), currency: data.currency || 'INR' }))
+      if (data) {
+        setForm(f => ({ ...f, name: data.name || '', monthly_income: String(data.monthly_income || ''), currency: data.currency || 'INR' }))
+        setAvatarUrl(data.avatar_url)
+      }
       setLoading(false)
     }
     load()
   }, [])
+
+  async function compressImage(file: File): Promise<Blob> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.readAsDataURL(file)
+      reader.onload = (event) => {
+        const img = new Image()
+        img.src = event.target?.result as string
+        img.onload = () => {
+          const canvas = document.createElement('canvas')
+          const MAX_WIDTH = 400
+          const MAX_HEIGHT = 400
+          let width = img.width
+          let height = img.height
+
+          if (width > height) {
+            if (width > MAX_WIDTH) {
+              height *= MAX_WIDTH / width
+              width = MAX_WIDTH
+            }
+          } else {
+            if (height > MAX_HEIGHT) {
+              width *= MAX_HEIGHT / height
+              height = MAX_HEIGHT
+            }
+          }
+
+          canvas.width = width
+          canvas.height = height
+          const ctx = canvas.getContext('2d')
+          ctx?.drawImage(img, 0, 0, width, height)
+          canvas.toBlob((blob) => {
+            if (blob) resolve(blob)
+            else reject(new Error('Canvas to Blob failed'))
+          }, 'image/jpeg', 0.7)
+        }
+      }
+      reader.onerror = (error) => reject(error)
+    })
+  }
+
+  async function handleAvatarUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setUploading(true)
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('No user')
+
+      // 1. Compress
+      const compressedBlob = await compressImage(file)
+      
+      // 2. Upload to Storage
+      const filePath = `${user.id}/${Math.random()}.jpg`
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, compressedBlob)
+
+      if (uploadError) throw uploadError
+
+      // 3. Get Public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(filePath)
+
+      // 4. Update Profile
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ avatar_url: publicUrl })
+        .eq('id', user.id)
+
+      if (updateError) throw updateError
+
+      setAvatarUrl(publicUrl)
+    } catch (err: any) {
+      alert(`Upload failed: ${err.message}. Make sure 'avatars' bucket exists in Supabase Storage.`)
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  async function removeAvatar() {
+    if (!confirm('Remove profile picture?')) return
+    setUploading(true)
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      await supabase.from('profiles').update({ avatar_url: null }).eq('id', user.id)
+      setAvatarUrl(null)
+    } finally {
+      setUploading(false)
+    }
+  }
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault()
@@ -52,7 +153,38 @@ export default function SettingsPage() {
       <div className="space-y-6">
         {/* Profile */}
         <div className="card">
-          <h2 className="font-semibold text-white mb-5 flex items-center gap-2"><User size={17} className="text-indigo-400" /> Profile</h2>
+          <h2 className="font-semibold text-white mb-6 flex items-center gap-2"><User size={17} className="text-indigo-400" /> Profile Settings</h2>
+          
+          <div className="flex flex-col sm:flex-row items-center gap-6 mb-8 p-4 bg-white/5 rounded-2xl border border-white/5">
+            <div className="relative group">
+              <div className="w-24 h-24 rounded-3xl bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center text-white text-3xl font-bold shadow-2xl overflow-hidden ring-4 ring-[#13131f]">
+                {avatarUrl ? (
+                  <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                ) : (
+                  form.name?.charAt(0).toUpperCase() || '?'
+                )}
+              </div>
+              <button 
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+                className="absolute -bottom-2 -right-2 w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-lg hover:bg-indigo-500 transition-colors disabled:opacity-50"
+              >
+                {uploading ? <Loader2 size={18} className="animate-spin" /> : <Camera size={18} />}
+              </button>
+              <input type="file" ref={fileInputRef} onChange={handleAvatarUpload} className="hidden" accept="image/*" />
+            </div>
+            
+            <div className="flex-1 text-center sm:text-left">
+              <h3 className="text-white font-bold text-lg">{form.name || 'Your Profile'}</h3>
+              <p className="text-slate-500 text-xs mb-3">Upload a clean profile picture (max 5MB, will be auto-compressed)</p>
+              {avatarUrl && (
+                <button onClick={removeAvatar} className="text-red-400 hover:text-red-300 text-xs font-semibold flex items-center gap-1.5 mx-auto sm:mx-0">
+                  <Trash2 size={12} /> Remove custom photo
+                </button>
+              )}
+            </div>
+          </div>
+
           <form onSubmit={handleSave} className="space-y-4">
             <div><label className="label">Display Name</label><input type="text" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} className="input" placeholder="Your name" /></div>
             <div className="grid grid-cols-2 gap-4">
@@ -63,8 +195,8 @@ export default function SettingsPage() {
                 </select>
               </div>
             </div>
-            <button type="submit" disabled={saving} className={`btn-primary ${saved ? '!bg-emerald-600' : ''}`}>
-              {saving ? <Loader2 size={16} className="animate-spin" /> : saved ? '✓ Saved!' : <><Save size={15} /> Save Profile</>}
+            <button type="submit" disabled={saving} className={`btn-primary w-full ${saved ? '!bg-emerald-600' : ''}`}>
+              {saving ? <Loader2 size={16} className="animate-spin" /> : saved ? '✓ Settings Saved' : <><Save size={15} /> Update Profile</>}
             </button>
           </form>
         </div>
