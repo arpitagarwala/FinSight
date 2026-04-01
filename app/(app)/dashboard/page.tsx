@@ -34,14 +34,31 @@ export default function DashboardPage() {
 
     const { start, end } = getMonthRange()
 
-    const [txRes, billRes] = await Promise.all([
+    const [txRes, billRes, debtRes] = await Promise.all([
       supabase.from('transactions').select('*').eq('user_id', user.id).order('date', { ascending: false }),
-      supabase.from('bills').select('*').eq('user_id', user.id).eq('is_paid', false).order('due_day').limit(5),
+      supabase.from('bills').select('*').eq('user_id', user.id).eq('is_paid', false),
+      supabase.from('debts').select('*').eq('user_id', user.id).not('due_date', 'is', null)
     ])
 
     const txs = txRes.data ?? []
-    const bills = billRes.data ?? []
-    setUpcomingBills(bills)
+    
+    // Combine bills and debts for upcoming
+    const today = new Date().getDate()
+    const rawBills = billRes.data ?? []
+    const debtBills = (debtRes.data ?? []).map((d: any) => ({
+      id: d.id,
+      name: `${d.name} (${d.type === 'credit_card' ? 'CC' : 'EMI'})`,
+      amount: Number(d.emi) || Number(d.outstanding),
+      due_day: d.due_date,
+      is_paid: false
+    }))
+    
+    const allUpcoming = [...rawBills, ...debtBills].map(b => {
+      const daysLeft = b.due_day >= today ? b.due_day - today : 31 - today + b.due_day
+      return { ...b, daysLeft }
+    }).sort((a, b) => a.daysLeft - b.daysLeft).slice(0, 5)
+
+    setUpcomingBills(allUpcoming)
     
     // Stats (Include all transactions for cash flow accuracy in the selected period)
     const fyTxs = txs.filter(t => t.date >= dateRange.from && t.date <= dateRange.to)
@@ -310,16 +327,14 @@ export default function DashboardPage() {
                 <p>No pending bills</p>
                 <Link href="/bills" className="text-indigo-400 text-xs mt-1 block">Add bills to track →</Link>
               </div>
-            ) : upcomingBills.map(bill => {
-              const today = new Date().getDate()
-              const daysLeft = bill.due_day >= today ? bill.due_day - today : 31 - today + bill.due_day
+            ) : upcomingBills.map((bill: any) => {
               return (
                 <div key={bill.id} className="table-row">
                   <div className="w-9 h-9 rounded-xl bg-yellow-500/10 flex items-center justify-center text-lg flex-shrink-0">🔔</div>
                   <div className="flex-1">
                     <p className="text-sm font-medium text-white">{bill.name}</p>
                     <p className="text-xs text-slate-500">
-                      Due in <span className={daysLeft <= 3 ? 'text-red-400 font-semibold' : 'text-yellow-400'}>{daysLeft}d</span>
+                      Due in <span className={bill.daysLeft <= 3 ? 'text-red-400 font-semibold' : 'text-yellow-400'}>{bill.daysLeft}d</span>
                     </p>
                   </div>
                   <span className="text-sm font-semibold text-white">{formatCurrency(bill.amount)}</span>

@@ -21,6 +21,11 @@ export default function SubscriptionAudit() {
   const [scanned, setScanned] = useState(false)
   const [totalMonthly, setTotalMonthly] = useState(0)
 
+  // Automatically scan on mount
+  useEffect(() => {
+    scanSubscriptions()
+  }, [])
+
   async function scanSubscriptions() {
     setLoading(true)
     try {
@@ -60,13 +65,13 @@ export default function SubscriptionAudit() {
       const detected: Subscription[] = []
       
       for (const [desc, data] of Object.entries(groups)) {
-        if (data.count < 2) continue
+        if (data.count < 3) continue
         
-        // Check if amounts are roughly consistent (within 30% variance)
+        // Check if amounts are highly consistent (within 0.5% variance)
         const avg = data.amounts.reduce((s, a) => s + a, 0) / data.amounts.length
-        const allSimilar = data.amounts.every(a => Math.abs(a - avg) / avg < 0.02)
+        const allSimilar = data.amounts.every(a => Math.abs(a - avg) / avg < 0.005)
         
-        if (!allSimilar && data.count < 3) continue
+        if (!allSimilar) continue
 
         const sortedDates = data.dates.sort()
         const lastDate = sortedDates[sortedDates.length - 1]
@@ -99,6 +104,9 @@ export default function SubscriptionAudit() {
     }
   }
 
+  // Hide completely if no subscriptions were found after scanning
+  if (scanned && subs.length === 0) return null
+
   return (
     <div className="card">
       <div className="flex items-center justify-between mb-4">
@@ -114,19 +122,16 @@ export default function SubscriptionAudit() {
           className="btn-secondary text-xs px-3 py-1.5"
         >
           {loading ? <RefreshCw size={13} className="animate-spin" /> : <Search size={13} />}
-          {scanned ? 'Re-scan' : 'Scan Now'}
+          Re-scan
         </button>
       </div>
 
-      {scanned && subs.length === 0 && (
+      {loading ? (
         <div className="text-center py-6">
-          <CheckCircle size={28} className="text-emerald-400 mx-auto mb-2" />
-          <p className="text-sm text-slate-400">No recurring subscriptions detected!</p>
-          <p className="text-xs text-slate-600 mt-1">Import more bank statements for better detection</p>
+          <RefreshCw size={24} className="text-indigo-400 animate-spin mx-auto mb-2" />
+          <p className="text-xs text-slate-500">Scanning transactions...</p>
         </div>
-      )}
-
-      {subs.length > 0 && (
+      ) : subs.length > 0 && (
         <>
           {/* Monthly total banner */}
           <div className="bg-amber-500/5 border border-amber-500/20 rounded-xl p-3 mb-4 flex items-center justify-between">
@@ -160,12 +165,6 @@ export default function SubscriptionAudit() {
             Based on pattern analysis of your last 6 months of expenses
           </p>
         </>
-      )}
-
-      {!scanned && (
-        <div className="text-center py-6">
-          <p className="text-xs text-slate-500">Click "Scan Now" to detect recurring subscriptions from your bank data</p>
-        </div>
       )}
     </div>
   )
