@@ -2,7 +2,7 @@
 export const dynamic = 'force-dynamic'
 
 import { useEffect, useState, useCallback } from 'react'
-import { Plus, X, Loader2, Pencil } from 'lucide-react'
+import { Plus, X, Loader2, Pencil, Sparkles, TrendingUp } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { formatCurrency } from '@/lib/utils'
 
@@ -19,6 +19,36 @@ export default function GoalsPage() {
   const [contribution, setContribution] = useState('')
   const [form, setForm] = useState({ name: '', target_amount: '', current_amount: '', target_date: '', icon: '🎯' })
   const [saving, setSaving] = useState(false)
+
+  function generateSmartTip(goal: Goal): string | null {
+    const remaining = goal.target_amount - goal.current_amount
+    if (remaining <= 0) return null
+    const daysLeft = goal.target_date ? Math.ceil((new Date(goal.target_date).getTime() - Date.now()) / 86400000) : null
+    const monthsLeft = daysLeft ? Math.max(Math.ceil(daysLeft / 30), 1) : null
+    const monthlyNeeded = monthsLeft ? remaining / monthsLeft : null
+    const dailyNeeded = daysLeft && daysLeft > 0 ? remaining / daysLeft : null
+
+    const tips: string[] = []
+    
+    if (dailyNeeded && dailyNeeded < 500) {
+      tips.push(`Save just ${formatCurrency(Math.ceil(dailyNeeded))}/day to hit this goal on time!`)
+    }
+    if (monthlyNeeded && monthlyNeeded < 50000) {
+      tips.push(`Set aside ${formatCurrency(Math.ceil(monthlyNeeded))}/month via auto-debit to stay on track`)
+    }
+    if (remaining < 10000) {
+      tips.push(`You're almost there! Just ${formatCurrency(remaining)} more to go 🔥`)
+    }
+    if (daysLeft && daysLeft < 30 && remaining > 0) {
+      tips.push(`⚡ Only ${daysLeft} days left — consider a one-time boost!`)
+    }
+    if (remaining > 50000 && dailyNeeded) {
+      const weeksNeeded = Math.ceil(remaining / (dailyNeeded * 7))
+      if (weeksNeeded <= 52) tips.push(`Skip one ₹300 order per week → reach this ${Math.ceil(remaining / 300)} weeks faster`)
+    }
+    if (tips.length === 0) return null
+    return tips[Math.floor(Math.random() * tips.length)]
+  }
 
   const load = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -119,9 +149,22 @@ export default function GoalsPage() {
                 </div>
 
                 {!done && (
-                  <button onClick={() => setContributeGoal(g)} className="btn-secondary w-full">
-                    <Pencil size={14} /> Add Funds
-                  </button>
+                  <>
+                    {(() => {
+                      const tip = generateSmartTip(g)
+                      return tip ? (
+                        <div className="mb-3 p-2.5 rounded-xl bg-indigo-500/5 border border-indigo-500/10">
+                          <p className="text-[11px] text-indigo-300 flex items-start gap-1.5">
+                            <Sparkles size={12} className="flex-shrink-0 mt-0.5" />
+                            {tip}
+                          </p>
+                        </div>
+                      ) : null
+                    })()}
+                    <button onClick={() => setContributeGoal(g)} className="btn-secondary w-full">
+                      <Pencil size={14} /> Add Funds
+                    </button>
+                  </>
                 )}
                 {done && <div className="badge badge-green w-full justify-center py-2">🎉 Goal Achieved!</div>}
               </div>

@@ -9,6 +9,7 @@ import { AreaChart, Area, PieChart, Pie, Cell, ResponsiveContainer, Tooltip, XAx
 import Link from 'next/link'
 import { useFilterContext } from '@/lib/context/FilterContext'
 import QuickLog from '@/components/ui/QuickLog'
+import SubscriptionAudit from '@/components/ui/SubscriptionAudit'
 
 export default function DashboardPage() {
   const supabase = createClient()
@@ -311,6 +312,9 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+
+      {/* Subscription Audit */}
+      <SubscriptionAudit />
     </div>
   )
 }
