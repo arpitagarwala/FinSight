@@ -204,12 +204,18 @@ async function refreshNewsFromSerpApi(supabase: any, logs: string[]) {
 
 function parseRelativeDate(dateStr: string): Date {
   if (!dateStr) return new Date()
-  const now = new Date()
   const lower = dateStr.toLowerCase().trim()
-  
+  const now = new Date()
+
+  // 1. Try absolute date parsing first
+  const parsed = new Date(dateStr)
+  if (!isNaN(parsed.getTime())) return parsed
+
+  // 2. Handle specific relative strings
   if (lower === 'just now') return now
   if (lower === 'yesterday') return new Date(now.getTime() - 24 * 60 * 60 * 1000)
   
+  // 3. Handle 'X ago' patterns
   const match = lower.match(/(\d+)\s+(minute|hour|day|week|month)s?\s+ago/)
   if (!match) return now
   const num = parseInt(match[1], 10)

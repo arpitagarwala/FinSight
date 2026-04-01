@@ -8,6 +8,7 @@ import { formatCurrency, getMonthRange, CATEGORY_COLORS, getFinancialYearRange }
 import { AreaChart, Area, PieChart, Pie, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import Link from 'next/link'
 import { useFilterContext } from '@/lib/context/FilterContext'
+import QuickLog from '@/components/ui/QuickLog'
 
 export default function DashboardPage() {
   const supabase = createClient()
@@ -129,6 +130,9 @@ export default function DashboardPage() {
         </div>
         <Link href="/transactions" className="btn-primary hidden sm:flex">Add Transaction</Link>
       </div>
+
+      {/* AI Quick Log */}
+      <QuickLog onSaved={() => loadDashboard()} />
 
       {/* Stat Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

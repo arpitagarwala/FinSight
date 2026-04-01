@@ -8,6 +8,7 @@ import { formatCurrency, formatDate, EXPENSE_CATEGORIES, INCOME_CATEGORIES, CATE
 import StatementAnalyzerModal from '@/components/transactions/StatementAnalyzerModal'
 import { Sparkles } from 'lucide-react'
 import { useFilterContext } from '@/lib/context/FilterContext'
+import QuickLog from '@/components/ui/QuickLog'
 
 type Tx = { id: string; amount: number; type: string; category: string; description: string; date: string }
 
@@ -103,6 +104,9 @@ export default function TransactionsPage() {
           <button onClick={() => { setEditing(null); setForm({ amount: '', type: 'expense', category: 'Food & Dining', description: '', date: new Date().toISOString().split('T')[0] }); setShowModal(true) }} className="btn-primary"><Plus size={16} /> Add</button>
         </div>
       </div>
+
+      {/* AI Quick Log */}
+      <QuickLog onSaved={() => load()} />
 
       {/* Summary */}
       <div className="grid grid-cols-2 gap-4 mb-6">

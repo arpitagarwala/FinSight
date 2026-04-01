@@ -5,12 +5,13 @@ import { useState } from 'react'
 import { Calculator, TrendingUp, Percent, RefreshCw, Building } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 
-type CalcTab = 'sip' | 'emi' | 'fd' | 'ppf' | 'gst' | 'currency' | 'loan_prepay'
+type CalcTab = 'income_tax' | 'sip' | 'emi' | 'fd' | 'ppf' | 'gst' | 'currency' | 'loan_prepay'
 
 export default function CalculatorsPage() {
-  const [tab, setTab] = useState<CalcTab>('sip')
+  const [tab, setTab] = useState<CalcTab>('income_tax')
 
   const tabs: { id: CalcTab; label: string; icon: string }[] = [
+    { id: 'income_tax', label: 'Income Tax', icon: '🏛️' },
     { id: 'sip', label: 'SIP', icon: '📈' },
     { id: 'emi', label: 'EMI', icon: '🏦' },
     { id: 'fd', label: 'FD / RD', icon: '💰' },
@@ -23,7 +24,7 @@ export default function CalculatorsPage() {
   return (
     <div className="max-w-3xl mx-auto">
       <div className="page-header">
-        <div><h1 className="section-title">Financial Calculators</h1><p className="text-slate-500 text-sm">7 calculators for smart financial planning</p></div>
+        <div><h1 className="section-title">Financial Calculators</h1><p className="text-slate-500 text-sm">8 calculators for smart financial planning</p></div>
       </div>
       <div className="flex flex-wrap gap-2 mb-8">
         {tabs.map(t => (
@@ -34,6 +35,7 @@ export default function CalculatorsPage() {
         ))}
       </div>
       <div className="animate-fade-in">
+        {tab === 'income_tax' && <IncomeTaxCalc />}
         {tab === 'sip' && <SIPCalc />}
         {tab === 'emi' && <EMICalc />}
         {tab === 'fd' && <FDCalc />}
@@ -274,6 +276,103 @@ function LoanPrepayCalc() {
         <ResultCard label="With Prepay" value={`${monthsWith} mo`} sub={`${(monthsWith / 12).toFixed(1)} years`} />
         <ResultCard label="Months Saved" value={`${saved} mo`} sub={interestSaved > 0 ? `Save ${formatCurrency(interestSaved)}` : 'Net interest'} />
       </div>
+    </div>
+  )
+}
+
+function IncomeTaxCalc() {
+  const [income, setIncome] = useState('1200000')
+  const [sec80c, setSec80c] = useState('150000')
+  const [sec80d, setSec80d] = useState('25000')
+  const [hra, setHra] = useState('0')
+  const [otherDeductions, setOtherDeductions] = useState('0')
+  const [age, setAge] = useState<'below60' | '60to80' | 'above80'>('below60')
+  const grossIncome = parseFloat(income) || 0
+  function calcOldRegime() {
+    const totalDeductions = Math.min(parseFloat(sec80c) || 0, 150000) + (parseFloat(sec80d) || 0) + (parseFloat(hra) || 0) + (parseFloat(otherDeductions) || 0) + 50000
+    const taxableIncome = Math.max(grossIncome - totalDeductions, 0)
+    let tax = 0
+    if (age === 'below60') {
+      if (taxableIncome > 250000) tax += Math.min(taxableIncome - 250000, 250000) * 0.05
+      if (taxableIncome > 500000) tax += Math.min(taxableIncome - 500000, 500000) * 0.20
+      if (taxableIncome > 1000000) tax += (taxableIncome - 1000000) * 0.30
+    } else if (age === '60to80') {
+      if (taxableIncome > 300000) tax += Math.min(taxableIncome - 300000, 200000) * 0.05
+      if (taxableIncome > 500000) tax += Math.min(taxableIncome - 500000, 500000) * 0.20
+      if (taxableIncome > 1000000) tax += (taxableIncome - 1000000) * 0.30
+    } else {
+      if (taxableIncome > 500000) tax += Math.min(taxableIncome - 500000, 500000) * 0.20
+      if (taxableIncome > 1000000) tax += (taxableIncome - 1000000) * 0.30
+    }
+    if (taxableIncome <= 500000) tax = 0
+    const cess = tax * 0.04
+    return { taxableIncome, tax, cess, total: tax + cess, deductions: totalDeductions }
+  }
+  function calcNewRegime() {
+    const standardDeduction = 75000
+    const taxableIncome = Math.max(grossIncome - standardDeduction, 0)
+    let tax = 0
+    const slabs = [{ limit: 400000, rate: 0 }, { limit: 800000, rate: 0.05 }, { limit: 1200000, rate: 0.10 }, { limit: 1600000, rate: 0.15 }, { limit: 2000000, rate: 0.20 }, { limit: 2400000, rate: 0.25 }, { limit: Infinity, rate: 0.30 }]
+    let remaining = taxableIncome, prevLimit = 0
+    for (const slab of slabs) { const slabWidth = slab.limit - prevLimit; const taxable = Math.min(remaining, slabWidth); tax += taxable * slab.rate; remaining -= taxable; prevLimit = slab.limit; if (remaining <= 0) break }
+    if (taxableIncome <= 1200000) tax = 0
+    const cess = tax * 0.04
+    return { taxableIncome, tax, cess, total: tax + cess, deductions: standardDeduction }
+  }
+  const oldRegime = calcOldRegime()
+  const newRegime = calcNewRegime()
+  const savings = oldRegime.total - newRegime.total
+  const recommended = savings > 0 ? 'New Regime' : savings < 0 ? 'Old Regime' : 'Either'
+  return (
+    <div className="space-y-6">
+      <div className="card space-y-5">
+        <h2 className="font-bold text-white flex items-center gap-2">🏛️ Income Tax Planner <span className="badge badge-blue text-[10px]">FY 2025-26</span></h2>
+        <div><label className="label">Gross Annual Income (₹)</label><input type="number" value={income} onChange={e => setIncome(e.target.value)} className="input" placeholder="e.g. 1200000" /></div>
+        <div className="grid grid-cols-2 gap-4">
+          <div><label className="label">Section 80C (₹) <span className="text-slate-600 text-[10px]">Max ₹1.5L</span></label><input type="number" value={sec80c} onChange={e => setSec80c(e.target.value)} className="input" placeholder="PPF, ELSS, LIC..." /></div>
+          <div><label className="label">Section 80D (₹) <span className="text-slate-600 text-[10px]">Health Insurance</span></label><input type="number" value={sec80d} onChange={e => setSec80d(e.target.value)} className="input" placeholder="25000" /></div>
+          <div><label className="label">HRA Exemption (₹)</label><input type="number" value={hra} onChange={e => setHra(e.target.value)} className="input" placeholder="0" /></div>
+          <div><label className="label">Other Deductions (₹)</label><input type="number" value={otherDeductions} onChange={e => setOtherDeductions(e.target.value)} className="input" placeholder="NPS, 80E, etc." /></div>
+        </div>
+        <div><label className="label">Age Group</label>
+          <div className="flex gap-2">
+            {([['below60', 'Below 60'], ['60to80', '60-80'], ['above80', 'Above 80']] as const).map(([val, label]) => (
+              <button key={val} onClick={() => setAge(val)} className={`flex-1 py-2.5 rounded-xl text-sm font-medium border transition-all ${age === val ? 'bg-indigo-500/20 border-indigo-500/50 text-indigo-400' : 'border-[#2a2a3e] text-slate-500 hover:text-white'}`}>{label}</button>
+            ))}
+          </div>
+        </div>
+      </div>
+      <div className={`card border-2 ${savings > 0 ? 'border-emerald-500/30 bg-emerald-500/5' : savings < 0 ? 'border-purple-500/30 bg-purple-500/5' : 'border-indigo-500/30 bg-indigo-500/5'}`}>
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div><p className="text-xs text-slate-400 uppercase font-bold tracking-wider mb-1">Recommended</p><p className="text-xl font-bold text-white">{recommended} {savings !== 0 ? `saves you ${formatCurrency(Math.abs(savings))}` : ''}</p></div>
+          <div className="text-4xl">{savings > 0 ? '🟢' : savings < 0 ? '🟣' : '⚪'}</div>
+        </div>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className={`card ${savings < 0 ? 'ring-2 ring-purple-500/30' : ''}`}>
+          <div className="flex items-center justify-between mb-4"><h3 className="font-bold text-white text-sm">Old Regime</h3>{savings < 0 && <span className="badge badge-purple text-[10px]">Better</span>}</div>
+          <div className="space-y-2.5 text-sm">
+            <div className="flex justify-between"><span className="text-slate-400">Gross Income</span><span className="text-white">{formatCurrency(grossIncome)}</span></div>
+            <div className="flex justify-between"><span className="text-emerald-400">Deductions</span><span className="text-emerald-400">-{formatCurrency(oldRegime.deductions)}</span></div>
+            <div className="h-px bg-[#1e1e2e]" /><div className="flex justify-between"><span className="text-slate-400">Taxable Income</span><span className="text-white font-medium">{formatCurrency(oldRegime.taxableIncome)}</span></div>
+            <div className="flex justify-between"><span className="text-slate-400">Income Tax</span><span className="text-white">{formatCurrency(oldRegime.tax)}</span></div>
+            <div className="flex justify-between"><span className="text-slate-400">Cess (4%)</span><span className="text-white">{formatCurrency(oldRegime.cess)}</span></div>
+            <div className="h-px bg-[#1e1e2e]" /><div className="flex justify-between font-bold text-base"><span className="text-white">Total Tax</span><span className="text-red-400">{formatCurrency(oldRegime.total)}</span></div>
+          </div>
+        </div>
+        <div className={`card ${savings > 0 ? 'ring-2 ring-emerald-500/30' : ''}`}>
+          <div className="flex items-center justify-between mb-4"><h3 className="font-bold text-white text-sm">New Regime</h3>{savings > 0 && <span className="badge badge-green text-[10px]">Better</span>}</div>
+          <div className="space-y-2.5 text-sm">
+            <div className="flex justify-between"><span className="text-slate-400">Gross Income</span><span className="text-white">{formatCurrency(grossIncome)}</span></div>
+            <div className="flex justify-between"><span className="text-emerald-400">Std. Deduction</span><span className="text-emerald-400">-{formatCurrency(newRegime.deductions)}</span></div>
+            <div className="h-px bg-[#1e1e2e]" /><div className="flex justify-between"><span className="text-slate-400">Taxable Income</span><span className="text-white font-medium">{formatCurrency(newRegime.taxableIncome)}</span></div>
+            <div className="flex justify-between"><span className="text-slate-400">Income Tax</span><span className="text-white">{formatCurrency(newRegime.tax)}</span></div>
+            <div className="flex justify-between"><span className="text-slate-400">Cess (4%)</span><span className="text-white">{formatCurrency(newRegime.cess)}</span></div>
+            <div className="h-px bg-[#1e1e2e]" /><div className="flex justify-between font-bold text-base"><span className="text-white">Total Tax</span><span className="text-red-400">{formatCurrency(newRegime.total)}</span></div>
+          </div>
+        </div>
+      </div>
+      <p className="text-xs text-slate-600 text-center">Tax calculations are approximate. Consult a CA for exact figures. Based on Union Budget 2025 slabs.</p>
     </div>
   )
 }
