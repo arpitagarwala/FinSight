@@ -7,12 +7,13 @@ import { createClient } from '@/lib/supabase/client'
 import { formatCurrency, getMonthRange, CATEGORY_COLORS, getFinancialYearRange } from '@/lib/utils'
 import { AreaChart, Area, PieChart, Pie, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import Link from 'next/link'
+import { useFilterContext } from '@/lib/context/FilterContext'
 
 export default function DashboardPage() {
   const supabase = createClient()
+  const { dateRange } = useFilterContext()
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState({ income: 0, expenses: 0, netWorth: 0, savings: 0 })
-  const [fyLabel, setFyLabel] = useState('')
   const [recent, setRecent] = useState<any[]>([])
   const [categoryData, setCategoryData] = useState<any[]>([])
   const [monthlyData, setMonthlyData] = useState<any[]>([])
@@ -21,7 +22,7 @@ export default function DashboardPage() {
   const [userName, setUserName] = useState('there')
   const [upcomingBills, setUpcomingBills] = useState<any[]>([])
 
-  useEffect(() => { loadDashboard() }, [])
+  useEffect(() => { loadDashboard() }, [dateRange])
 
   async function loadDashboard() {
     const { data: { user } } = await supabase.auth.getUser()
@@ -38,21 +39,13 @@ export default function DashboardPage() {
     const txs = txRes.data ?? []
     const bills = billRes.data ?? []
     setUpcomingBills(bills)
-    setRecent(txs.slice(0, 6))
-
-    // Determine target Financial Year (Smart Lookback)
-    let fy = getFinancialYearRange()
-    const currentFYTxs = txs.filter(t => t.date >= fy.start && t.date <= fy.end)
     
-    // If current FY is empty, find the latest year with data
-    if (currentFYTxs.length === 0 && txs.length > 0) {
-      const latestDate = new Date(txs[0].date)
-      fy = getFinancialYearRange(latestDate)
-    }
-    setFyLabel(fy.label)
+    // Stats (Include all transactions for cash flow accuracy in the selected period)
+    const fyTxs = txs.filter(t => t.date >= dateRange.from && t.date <= dateRange.to)
+    
+    // Recent transactions only from the selected period
+    setRecent(fyTxs.slice(0, 6))
 
-    // Stats (Include all transactions for cash flow accuracy in the selected FY)
-    const fyTxs = txs.filter(t => t.date >= fy.start && t.date <= fy.end)
     const income = fyTxs.filter(t => t.type === 'income').reduce((s, t) => s + Number(t.amount), 0)
     const expenses = fyTxs.filter(t => t.type === 'expense').reduce((s, t) => s + Number(t.amount), 0)
     setStats({ income, expenses, netWorth: income - expenses, savings: income > 0 ? ((income - expenses) / income) * 100 : 0 })
@@ -64,8 +57,8 @@ export default function DashboardPage() {
     })
     setCategoryData(Object.entries(cats).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value).slice(0, 6))
 
-    // Monthly trend (6 months ending at the end of the selected FY or current date)
-    const trendEndDate = new Date(fy.end) < new Date() ? new Date(fy.end) : new Date()
+    // Monthly trend (6 months ending at the end of the selected period or current date)
+    const trendEndDate = new Date(dateRange.to) < new Date() ? new Date(dateRange.to) : new Date()
     const months: any[] = []
     for (let i = 5; i >= 0; i--) {
       const ms = new Date(trendEndDate.getFullYear(), trendEndDate.getMonth() - i, 1)
@@ -132,7 +125,7 @@ export default function DashboardPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white">{greeting}, {userName}! 👋</h1>
-          <p className="text-slate-500 text-sm mt-1">Here's your financial snapshot for {fyLabel}</p>
+          <p className="text-slate-500 text-sm mt-1">Here's your financial snapshot for <strong className="text-slate-300">{dateRange.label}</strong></p>
         </div>
         <Link href="/transactions" className="btn-primary hidden sm:flex">Add Transaction</Link>
       </div>

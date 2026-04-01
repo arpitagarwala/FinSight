@@ -7,11 +7,13 @@ import { createClient } from '@/lib/supabase/client'
 import { formatCurrency, formatDate, EXPENSE_CATEGORIES, INCOME_CATEGORIES, CATEGORY_COLORS } from '@/lib/utils'
 import StatementAnalyzerModal from '@/components/transactions/StatementAnalyzerModal'
 import { Sparkles } from 'lucide-react'
+import { useFilterContext } from '@/lib/context/FilterContext'
 
 type Tx = { id: string; amount: number; type: string; category: string; description: string; date: string }
 
 export default function TransactionsPage() {
   const supabase = createClient()
+  const { dateRange } = useFilterContext()
   const [txs, setTxs] = useState<Tx[]>([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
@@ -36,6 +38,7 @@ export default function TransactionsPage() {
   useEffect(() => { load() }, [load])
 
   const filtered = txs.filter(t => {
+    if (t.date < dateRange.from || t.date > dateRange.to) return false
     if (typeFilter !== 'all' && t.type !== typeFilter) return false
     if (search && !t.description?.toLowerCase().includes(search.toLowerCase()) && !t.category.toLowerCase().includes(search.toLowerCase())) return false
     return true
@@ -87,7 +90,7 @@ export default function TransactionsPage() {
       <div className="page-header">
         <div>
           <h1 className="section-title">Transactions</h1>
-          <p className="text-slate-500 text-sm">{txs.length} total transactions</p>
+          <p className="text-slate-500 text-sm">{filtered.length} transactions in <strong className="text-slate-300">{dateRange.label}</strong></p>
         </div>
         <div className="flex items-center gap-2">
           <button 

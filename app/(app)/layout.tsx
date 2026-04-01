@@ -9,6 +9,8 @@ import {
   Newspaper, Settings, LogOut, TrendingUpIcon, Menu, X, ChevronRight
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { FilterProvider } from '@/lib/context/FilterContext'
+import DateRangeSelector from '@/components/ui/DateRangeSelector'
 
 
 const navItems = [
@@ -120,43 +122,52 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   )
 
   return (
-    <div className="flex h-screen overflow-hidden" style={{ background: 'var(--bg-primary)' }}>
-      {/* Desktop Sidebar */}
-      <aside className="hidden lg:flex w-64 flex-col border-r border-[#1e1e2e] flex-shrink-0" style={{ background: 'var(--bg-secondary)' }}>
-        <SidebarContent />
-      </aside>
+    <FilterProvider>
+      <div className="flex h-screen overflow-hidden" style={{ background: 'var(--bg-primary)' }}>
+        {/* Desktop Sidebar */}
+        <aside className="hidden lg:flex w-64 flex-col border-r border-[#1e1e2e] flex-shrink-0" style={{ background: 'var(--bg-secondary)' }}>
+          <SidebarContent />
+        </aside>
 
-      {/* Mobile Overlay */}
-      {sidebarOpen && (
-        <div className="lg:hidden fixed inset-0 z-50 flex">
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setSidebarOpen(false)} />
-          <aside className="relative w-72 flex-col border-r border-[#1e1e2e] z-10 flex" style={{ background: 'var(--bg-secondary)' }}>
-            <button onClick={() => setSidebarOpen(false)} className="absolute top-4 right-4 text-slate-500 hover:text-white">
-              <X size={20} />
-            </button>
-            <SidebarContent />
-          </aside>
-        </div>
-      )}
-
-      {/* Main */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Mobile Header */}
-        <header className="lg:hidden flex items-center justify-between px-4 h-14 border-b border-[#1e1e2e] flex-shrink-0" style={{ background: 'var(--bg-secondary)' }}>
-          <button onClick={() => setSidebarOpen(true)} className="text-slate-400 hover:text-white">
-            <Menu size={22} />
-          </button>
-          <span className="font-bold gradient-text text-lg">FinSight AI</span>
-          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center text-white text-sm font-bold">
-            {userName.charAt(0).toUpperCase()}
+        {/* Mobile Overlay */}
+        {sidebarOpen && (
+          <div className="lg:hidden fixed inset-0 z-50 flex">
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setSidebarOpen(false)} />
+            <aside className="relative w-72 flex-col border-r border-[#1e1e2e] z-10 flex" style={{ background: 'var(--bg-secondary)' }}>
+              <button onClick={() => setSidebarOpen(false)} className="absolute top-4 right-4 text-slate-500 hover:text-white">
+                <X size={20} />
+              </button>
+              <SidebarContent />
+            </aside>
           </div>
-        </header>
+        )}
 
-        {/* Page content */}
-        <main className="flex-1 overflow-y-auto p-6 animate-fade-in">
-          {children}
-        </main>
+        {/* Main */}
+        <div className="flex-1 flex flex-col overflow-hidden">
+          {/* Mobile Header */}
+          <header className="lg:hidden flex items-center justify-between px-4 py-3 border-b border-[#1e1e2e] flex-shrink-0" style={{ background: 'var(--bg-secondary)' }}>
+            <div className="flex items-center gap-3">
+              <button onClick={() => setSidebarOpen(true)} className="text-slate-400 hover:text-white">
+                <Menu size={22} />
+              </button>
+              <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center text-white font-bold shadow-lg shadow-indigo-500/20">
+                {userName ? userName.charAt(0).toUpperCase() : ''}
+              </div>
+            </div>
+            <DateRangeSelector />
+          </header>
+          
+          {/* Desktop Topbar */}
+          <header className="hidden lg:flex items-center justify-end px-6 py-3 border-b border-[#1e1e2e] flex-shrink-0" style={{ background: 'var(--bg-secondary)' }}>
+            <DateRangeSelector />
+          </header>
+
+          {/* Page content */}
+          <main className="flex-1 overflow-y-auto p-4 lg:p-6 animate-fade-in">
+            {children}
+          </main>
+        </div>
       </div>
-    </div>
+    </FilterProvider>
   )
 }
