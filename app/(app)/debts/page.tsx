@@ -62,7 +62,7 @@ export default function DebtsPage() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
         <div className="stat-card">
           <span className="stat-label">Total Outstanding</span>
           <span className="stat-value text-red-400">{formatCurrency(totalOutstanding)}</span>
@@ -118,7 +118,7 @@ export default function DebtsPage() {
                   <span>{pct.toFixed(0)}% complete</span>
                   <span>Principal: {formatCurrency(d.principal)}</span>
                 </div>
-                <div className="flex items-center gap-4 text-xs text-slate-400 bg-[#0f0f1a] rounded-xl px-3 py-2">
+                <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs text-slate-400 bg-[#0f0f1a] rounded-xl px-3 py-2">
                   {d.emi && <span>EMI: <strong className="text-white">{formatCurrency(d.emi)}/mo</strong></span>}
                   {d.due_date && <span>Due: <strong className="text-white">{d.due_date}th</strong> of month</span>}
                   {ml && <span className="ml-auto">~<strong className="text-orange-400">{ml} months</strong> left</span>}

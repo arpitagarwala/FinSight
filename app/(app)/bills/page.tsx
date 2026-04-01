@@ -88,7 +88,7 @@ export default function BillsPage() {
       </div>
 
       {/* Summary */}
-      <div className="grid grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
         <div className="stat-card"><span className="stat-label">Monthly Total</span><span className="stat-value">{formatCurrency(totalMonthly)}</span></div>
         <div className="stat-card"><span className="stat-label">Paid</span><span className="stat-value text-emerald-400">{formatCurrency(totalPaid)}</span></div>
         <div className="stat-card"><span className="stat-label">Remaining</span><span className="stat-value text-yellow-400">{formatCurrency(totalMonthly - totalPaid)}</span></div>

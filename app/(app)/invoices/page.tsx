@@ -370,7 +370,7 @@ export default function InvoicesPage() {
         <button onClick={() => setShowModal(true)} className="btn-primary"><Plus size={16} /> New Invoice</button>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
         <div className="stat-card"><span className="stat-label">Pending</span><span className="stat-value text-yellow-400">{formatCurrency(totalPending)}</span></div>
         <div className="stat-card"><span className="stat-label">Collected</span><span className="stat-value text-emerald-400">{formatCurrency(totalPaid)}</span></div>
       </div>
@@ -401,7 +401,7 @@ export default function InvoicesPage() {
           {invoices.length === 0 && <button onClick={() => setShowModal(true)} className="btn-primary mx-auto mt-3"><Plus size={16} /> Create Invoice</button>}
         </div>
       ) : (
-        <div className="card p-0 overflow-hidden">
+        <div className="card p-0 overflow-x-auto">
           <table className="w-full text-sm">
             <thead><tr className="border-b border-[#1e1e2e]">
               {['Invoice #', 'Client', 'Amount', 'Status', 'Due', 'Actions'].map(h => (
@@ -463,7 +463,7 @@ export default function InvoicesPage() {
             {/* Template selector */}
             <div className="mb-4">
               <label className="label text-xs mb-2">Choose Template</label>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                 {([['modern_dark', '🌙 Modern Dark'], ['classic_white', '📄 Classic White'], ['minimal', '✨ Minimal']] as const).map(([id, name]) => (
                   <button key={id} onClick={() => setDlTemplate(id)}
                     className={`p-3 rounded-xl border text-xs font-semibold transition-all ${dlTemplate === id ? 'border-indigo-500 bg-indigo-500/10 text-indigo-300' : 'border-[#1e1e2e] text-slate-500 hover:text-white hover:border-[#2a2a3e]'}`}>
@@ -476,7 +476,7 @@ export default function InvoicesPage() {
             {/* Business info */}
             <div className="bg-[#0f0f1a] rounded-xl p-3 space-y-2 mb-4">
               <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Your Business Details</p>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                 <input type="text" value={businessInfo.company} onChange={e => setBusinessInfo(b => ({ ...b, company: e.target.value }))} className="input text-xs py-2" placeholder="Company name" />
                 <input type="text" value={businessInfo.address} onChange={e => setBusinessInfo(b => ({ ...b, address: e.target.value }))} className="input text-xs py-2" placeholder="Address" />
                 <input type="text" value={businessInfo.gstin} onChange={e => setBusinessInfo(b => ({ ...b, gstin: e.target.value }))} className="input text-xs py-2" placeholder="Your GSTIN" />
@@ -515,7 +515,7 @@ export default function InvoicesPage() {
             </div>
             <form onSubmit={handleSave} className="space-y-4">
               {/* Client Info */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="label">Client Name *</label>
                   <input type="text" value={form.client_name} onChange={e => setForm(f => ({ ...f, client_name: e.target.value }))} className="input" placeholder="Company / Person" required />
@@ -554,7 +554,7 @@ export default function InvoicesPage() {
               </div>
 
               {/* Dates & GST */}
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="label">GST Rate (%)</label>
                   <input type="number" value={form.gst_rate} onChange={e => setForm(f => ({ ...f, gst_rate: e.target.value }))} className="input" />
