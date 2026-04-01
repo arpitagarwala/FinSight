@@ -83,6 +83,10 @@ export default function DashboardPage() {
   }
 
   async function generateInsight(income: number, expenses: number, cats: Record<string, number>) {
+    const cacheKey = `finsight-ai-${dateRange.from}-${Math.round(income)}-${Math.round(expenses)}`
+    const cached = typeof window !== 'undefined' ? sessionStorage.getItem(cacheKey) : null
+    if (cached) { setAiInsight(cached); return }
+    
     setInsightLoading(true)
     try {
       const topCat = Object.entries(cats).sort((a, b) => b[1] - a[1])[0]
@@ -91,11 +95,13 @@ export default function DashboardPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           prompt: `Give a single, actionable personal finance insight (2-3 sentences, friendly tone, no markdown) for someone who earned ${formatCurrency(income)} and spent ${formatCurrency(expenses)} this month. ${topCat ? `Their biggest expense was ${topCat[0]} at ${formatCurrency(topCat[1])}.` : ''} Focus on a specific actionable tip.`,
-          cacheKey: `daily-insight-${new Date().toISOString().split('T')[0]}-${Math.round(income)}-${Math.round(expenses)}`
+          cacheKey
         })
       })
       const data = await res.json()
-      setAiInsight(data.response || getFallbackInsight(income, expenses, cats))
+      const insight = data.response || getFallbackInsight(income, expenses, cats)
+      setAiInsight(insight)
+      if (typeof window !== 'undefined') sessionStorage.setItem(cacheKey, insight)
     } catch {
       setAiInsight(getFallbackInsight(income, expenses, cats))
     }

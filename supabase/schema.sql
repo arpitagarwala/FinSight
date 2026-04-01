@@ -72,6 +72,7 @@ create table if not exists public.invoices (
   client_name text not null,
   client_email text,
   client_address text,
+  client_gstin text,
   items jsonb not null default '[]',
   gst_rate numeric(5,2) default 0,
   subtotal numeric(12,2) not null,
