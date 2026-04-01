@@ -23,8 +23,9 @@ export default function DashboardPage() {
   const [insightLoading, setInsightLoading] = useState(false)
   const [userName, setUserName] = useState('there')
   const [upcomingBills, setUpcomingBills] = useState<any[]>([])
+  const [trendRange, setTrendRange] = useState(6)
 
-  useEffect(() => { loadDashboard() }, [dateRange])
+  useEffect(() => { loadDashboard() }, [dateRange, trendRange])
 
   async function loadDashboard() {
     const { data: { user } } = await supabase.auth.getUser()
@@ -59,10 +60,10 @@ export default function DashboardPage() {
     })
     setCategoryData(Object.entries(cats).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value).slice(0, 6))
 
-    // Monthly trend (6 months ending at the end of the selected period or current date)
+    // Monthly trend (dynamic range)
     const trendEndDate = new Date(dateRange.to) < new Date() ? new Date(dateRange.to) : new Date()
     const months: any[] = []
-    for (let i = 5; i >= 0; i--) {
+    for (let i = trendRange - 1; i >= 0; i--) {
       const ms = new Date(trendEndDate.getFullYear(), trendEndDate.getMonth() - i, 1)
       const me = new Date(trendEndDate.getFullYear(), trendEndDate.getMonth() - i + 1, 0)
       const rangeStart = ms.toISOString().split('T')[0]
@@ -187,7 +188,17 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Monthly Trend */}
         <div className="card lg:col-span-2">
-          <h3 className="font-semibold text-white mb-4">6-Month Trend</h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold text-white">Income vs Expenses</h3>
+            <div className="flex gap-1 bg-[#0f0f1a] rounded-xl p-1">
+              {[3, 6, 12].map(r => (
+                <button key={r} onClick={() => setTrendRange(r)}
+                  className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${trendRange === r ? 'bg-indigo-600 text-white shadow' : 'text-slate-500 hover:text-white'}`}>
+                  {r}mo
+                </button>
+              ))}
+            </div>
+          </div>
           <ResponsiveContainer width="100%" height={200}>
             <AreaChart data={monthlyData}>
               <defs>

@@ -64,7 +64,7 @@ export default function SubscriptionAudit() {
         
         // Check if amounts are roughly consistent (within 30% variance)
         const avg = data.amounts.reduce((s, a) => s + a, 0) / data.amounts.length
-        const allSimilar = data.amounts.every(a => Math.abs(a - avg) / avg < 0.3)
+        const allSimilar = data.amounts.every(a => Math.abs(a - avg) / avg < 0.02)
         
         if (!allSimilar && data.count < 3) continue
 

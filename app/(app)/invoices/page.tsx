@@ -2,138 +2,205 @@
 export const dynamic = 'force-dynamic'
 
 import { useEffect, useState, useCallback } from 'react'
-import { Plus, X, Loader2, Download, Check, Clock, AlertCircle } from 'lucide-react'
+import { Plus, X, Loader2, Download, Check, Clock, AlertCircle, Palette } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import jsPDF from 'jspdf'
 
+type InvoiceTemplate = 'modern_dark' | 'classic_white' | 'minimal'
+
 type InvoiceItem = { description: string; qty: number; rate: number }
 type Invoice = { id: string; invoice_number: string; client_name: string; client_email: string; items: InvoiceItem[]; gst_rate: number; subtotal: number; gst_amount: number; total: number; status: string; issue_date: string; due_date: string; notes: string }
 
-function downloadPDF(inv: Invoice, userName: string) {
+function downloadPDF(inv: Invoice, userName: string, template: InvoiceTemplate = 'modern_dark', businessInfo?: { company: string; address: string; gstin: string }) {
   const doc = new jsPDF()
-  const primaryColor = '#6366f1'
-  const secondaryColor = '#94a3b8'
-  
-  // Background
-  doc.setFillColor(15, 15, 26)
-  doc.rect(0, 0, 210, 297, 'F')
-  
-  // Header Branding
-  doc.setFillColor(99, 102, 241)
-  doc.rect(0, 0, 210, 40, 'F')
-  
-  doc.setTextColor('#ffffff')
-  doc.setFontSize(24)
-  doc.setFont('helvetica', 'bold')
-  doc.text('FinSight AI', 20, 25)
-  
-  doc.setFontSize(10)
-  doc.setFont('helvetica', 'normal')
-  doc.text('Professional Invoice Generator', 20, 32)
-  
-  // Invoice Info (Top Right)
-  doc.setFontSize(20)
-  doc.text('INVOICE', 140, 25)
-  doc.setFontSize(10)
-  doc.text(`# ${inv.invoice_number}`, 140, 32)
-  
-  // From / To Section
-  doc.setTextColor('#ffffff')
-  doc.setFontSize(12)
-  doc.setFont('helvetica', 'bold')
-  doc.text('FROM:', 20, 60)
-  doc.setFont('helvetica', 'normal')
-  doc.setFontSize(10)
-  doc.text(userName, 20, 68)
-  
-  doc.setFontSize(12)
-  doc.setFont('helvetica', 'bold')
-  doc.text('BILL TO:', 120, 60)
-  doc.setFont('helvetica', 'normal')
-  doc.setFontSize(11)
-  doc.text(inv.client_name, 120, 68)
-  doc.setTextColor(secondaryColor)
-  doc.setFontSize(10)
-  if (inv.client_email) doc.text(inv.client_email, 120, 75)
-  
-  // Dates
-  doc.setTextColor('#ffffff')
-  doc.text(`Issue Date: ${formatDate(inv.issue_date)}`, 20, 85)
-  if (inv.due_date) doc.text(`Due Date: ${formatDate(inv.due_date)}`, 20, 92)
-  
-  // Table Header
-  doc.setFillColor(30, 30, 46) 
-  doc.rect(20, 105, 170, 10, 'F')
-  doc.setTextColor('#ffffff')
-  doc.setFont('helvetica', 'bold')
-  doc.text('Description', 25, 112)
-  doc.text('Qty', 110, 112)
-  doc.text('Rate', 130, 112)
-  doc.text('Amount', 160, 112)
-  
-  // Table Rows
-  let y = 125
-  doc.setFont('helvetica', 'normal')
-  inv.items.forEach((item, i) => {
-    if (y > 250) { 
-      doc.addPage()
-      doc.setFillColor(15, 15, 26)
-      doc.rect(0, 0, 210, 297, 'F')
-      y = 20 
-    }
-    doc.setTextColor('#f1f5f9')
-    doc.text(item.description, 25, y)
-    doc.text(String(item.qty), 110, y)
-    doc.text(formatCurrency(item.rate), 130, y)
-    doc.text(formatCurrency(item.qty * item.rate), 160, y)
-    doc.setDrawColor(40, 40, 60)
-    doc.line(20, y + 4, 190, y + 4)
-    y += 12
-  })
-  
-  // Summary Section
-  y += 10
-  doc.setFontSize(10)
-  doc.setTextColor(secondaryColor)
-  doc.text('Subtotal:', 130, y)
-  doc.setTextColor('#ffffff')
-  doc.text(formatCurrency(inv.subtotal), 160, y)
-  
-  y += 8
-  if (inv.gst_rate > 0) {
-    doc.setTextColor(secondaryColor)
-    doc.text(`GST (${inv.gst_rate}%):`, 130, y)
-    doc.setTextColor('#ffffff')
-    doc.text(formatCurrency(inv.gst_amount), 160, y)
-    y += 8
-  }
-  
-  // Total Bar
-  doc.setFillColor(99, 102, 241)
-  doc.rect(125, y - 2, 65, 12, 'F')
-  doc.setTextColor('#ffffff')
-  doc.setFontSize(12)
-  doc.setFont('helvetica', 'bold')
-  doc.text('TOTAL:', 130, y + 6)
-  doc.text(formatCurrency(inv.total), 160, y + 6)
-  
-  // Notes & Footer
-  if (inv.notes) {
-    y += 25
-    doc.setFontSize(10)
-    doc.setTextColor('#ffffff')
+  const company = businessInfo?.company || userName
+  const address = businessInfo?.address || ''
+  const gstin = businessInfo?.gstin || ''
+
+  if (template === 'classic_white') {
+    // ===== CLASSIC WHITE TEMPLATE =====
+    doc.setFillColor(255, 255, 255)
+    doc.rect(0, 0, 210, 297, 'F')
+    
+    // Blue accent line
+    doc.setFillColor(37, 99, 235)
+    doc.rect(0, 0, 210, 4, 'F')
+    
+    doc.setTextColor('#1e293b')
+    doc.setFontSize(22)
     doc.setFont('helvetica', 'bold')
-    doc.text('NOTES / TERMS:', 20, y)
+    doc.text('INVOICE', 20, 30)
+    
+    doc.setFontSize(10)
+    doc.setTextColor('#64748b')
     doc.setFont('helvetica', 'normal')
-    doc.setTextColor(secondaryColor)
-    doc.text(inv.notes, 20, y + 8, { maxWidth: 170 })
-  }
+    doc.text(`# ${inv.invoice_number}`, 20, 38)
+    doc.text(`Issue Date: ${formatDate(inv.issue_date)}`, 20, 45)
+    if (inv.due_date) doc.text(`Due Date: ${formatDate(inv.due_date)}`, 20, 52)
+    
+    // From
+    doc.setTextColor('#1e293b')
+    doc.setFontSize(9)
+    doc.setFont('helvetica', 'bold')
+    doc.text('FROM', 130, 22)
+    doc.setFont('helvetica', 'normal')
+    doc.text(company, 130, 28)
+    if (address) doc.text(address, 130, 34, { maxWidth: 60 })
+    if (gstin) { doc.setTextColor('#2563eb'); doc.text(`GSTIN: ${gstin}`, 130, address ? 44 : 34) }
+    
+    // Bill To
+    doc.setTextColor('#1e293b')
+    doc.setFont('helvetica', 'bold')
+    doc.text('BILL TO', 130, address ? 54 : 44)
+    doc.setFont('helvetica', 'normal')
+    doc.text(inv.client_name, 130, address ? 60 : 50)
+    if (inv.client_email) { doc.setTextColor('#64748b'); doc.text(inv.client_email, 130, address ? 66 : 56) }
+    
+    // Table
+    let y = 70
+    doc.setFillColor(241, 245, 249)
+    doc.rect(20, y, 170, 10, 'F')
+    doc.setTextColor('#475569')
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(9)
+    doc.text('Description', 25, y + 7)
+    doc.text('Qty', 115, y + 7)
+    doc.text('Rate', 140, y + 7)
+    doc.text('Amount', 168, y + 7)
+    y += 16
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor('#334155')
+    inv.items.forEach(item => {
+      if (y > 250) { doc.addPage(); y = 20 }
+      doc.text(item.description, 25, y)
+      doc.text(String(item.qty), 115, y)
+      doc.text(formatCurrency(item.rate), 140, y)
+      doc.text(formatCurrency(item.qty * item.rate), 168, y)
+      doc.setDrawColor(226, 232, 240)
+      doc.line(20, y + 4, 190, y + 4)
+      y += 12
+    })
+    y += 10
+    doc.setTextColor('#64748b')
+    doc.text('Subtotal:', 140, y); doc.setTextColor('#1e293b'); doc.text(formatCurrency(inv.subtotal), 168, y)
+    if (inv.gst_rate > 0) { y += 8; doc.setTextColor('#64748b'); doc.text(`GST (${inv.gst_rate}%):`, 140, y); doc.setTextColor('#1e293b'); doc.text(formatCurrency(inv.gst_amount), 168, y) }
+    y += 10
+    doc.setFillColor(37, 99, 235); doc.rect(135, y - 4, 55, 12, 'F')
+    doc.setTextColor('#ffffff'); doc.setFont('helvetica', 'bold'); doc.setFontSize(11)
+    doc.text('TOTAL', 140, y + 4); doc.text(formatCurrency(inv.total), 168, y + 4)
+    if (inv.notes) { y += 20; doc.setTextColor('#475569'); doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.text('NOTES:', 20, y); doc.setFont('helvetica', 'normal'); doc.text(inv.notes, 20, y + 7, { maxWidth: 170 }) }
+    doc.setTextColor('#94a3b8'); doc.setFontSize(8); doc.text('Generated by FinSight AI', 105, 290, { align: 'center' })
   
-  doc.setFontSize(9)
-  doc.setTextColor(secondaryColor)
-  doc.text('Thank you for your business!', 105, 285, { align: 'center' })
-  doc.text('Generated by FinSight AI - Your Smart Financial Companion', 105, 290, { align: 'center' })
+  } else if (template === 'minimal') {
+    // ===== MINIMAL TEMPLATE =====
+    doc.setFillColor(250, 250, 250)
+    doc.rect(0, 0, 210, 297, 'F')
+    
+    doc.setTextColor('#111827')
+    doc.setFontSize(11)
+    doc.setFont('helvetica', 'bold')
+    doc.text(company.toUpperCase(), 20, 20)
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(9)
+    doc.setTextColor('#6b7280')
+    if (address) doc.text(address, 20, 26)
+    if (gstin) doc.text(`GSTIN: ${gstin}`, 20, address ? 32 : 26)
+    
+    doc.setTextColor('#111827')
+    doc.setFontSize(28)
+    doc.setFont('helvetica', 'bold')
+    doc.text('Invoice', 20, 55)
+    doc.setFontSize(9)
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor('#9ca3af')
+    doc.text(inv.invoice_number, 20, 62)
+    doc.text(`${formatDate(inv.issue_date)}${inv.due_date ? ` · Due ${formatDate(inv.due_date)}` : ''}`, 20, 68)
+    
+    doc.setTextColor('#111827')
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(9)
+    doc.text('Billed to', 140, 50)
+    doc.setFont('helvetica', 'normal')
+    doc.text(inv.client_name, 140, 57)
+    if (inv.client_email) { doc.setTextColor('#9ca3af'); doc.text(inv.client_email, 140, 63) }
+    
+    let y = 82
+    doc.setDrawColor(229, 231, 235); doc.line(20, y, 190, y)
+    y += 8
+    doc.setTextColor('#6b7280'); doc.setFont('helvetica', 'bold'); doc.setFontSize(8)
+    doc.text('ITEM', 20, y); doc.text('QTY', 120, y); doc.text('RATE', 145, y); doc.text('TOTAL', 172, y)
+    y += 8; doc.setDrawColor(229, 231, 235); doc.line(20, y - 3, 190, y - 3)
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor('#374151')
+    inv.items.forEach(item => {
+      if (y > 250) { doc.addPage(); doc.setFillColor(250, 250, 250); doc.rect(0, 0, 210, 297, 'F'); y = 20 }
+      doc.text(item.description, 20, y)
+      doc.text(String(item.qty), 120, y)
+      doc.text(formatCurrency(item.rate), 145, y)
+      doc.text(formatCurrency(item.qty * item.rate), 172, y)
+      y += 10
+    })
+    doc.setDrawColor(229, 231, 235); doc.line(20, y, 190, y); y += 10
+    doc.setTextColor('#6b7280')
+    doc.text('Subtotal', 145, y); doc.setTextColor('#111827'); doc.text(formatCurrency(inv.subtotal), 172, y)
+    if (inv.gst_rate > 0) { y += 8; doc.setTextColor('#6b7280'); doc.text(`GST ${inv.gst_rate}%`, 145, y); doc.setTextColor('#111827'); doc.text(formatCurrency(inv.gst_amount), 172, y) }
+    y += 10; doc.setFont('helvetica', 'bold'); doc.setFontSize(12); doc.setTextColor('#111827')
+    doc.text('Total', 145, y); doc.text(formatCurrency(inv.total), 172, y)
+    if (inv.notes) { y += 20; doc.setTextColor('#9ca3af'); doc.setFontSize(8); doc.setFont('helvetica', 'normal'); doc.text(inv.notes, 20, y, { maxWidth: 170 }) }
+    doc.setTextColor('#d1d5db'); doc.setFontSize(7); doc.text('FinSight AI', 105, 290, { align: 'center' })
+  
+  } else {
+    // ===== MODERN DARK TEMPLATE (default) =====
+    doc.setFillColor(15, 15, 26); doc.rect(0, 0, 210, 297, 'F')
+    doc.setFillColor(99, 102, 241); doc.rect(0, 0, 210, 40, 'F')
+    doc.setTextColor('#ffffff'); doc.setFontSize(24); doc.setFont('helvetica', 'bold')
+    doc.text(company || 'FinSight AI', 20, 25)
+    doc.setFontSize(10); doc.setFont('helvetica', 'normal')
+    if (address) doc.text(address, 20, 32)
+    else doc.text('Professional Invoice', 20, 32)
+    doc.setFontSize(20); doc.text('INVOICE', 140, 25)
+    doc.setFontSize(10); doc.text(`# ${inv.invoice_number}`, 140, 32)
+    
+    doc.setFontSize(12); doc.setFont('helvetica', 'bold')
+    doc.text('FROM:', 20, 55)
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(10)
+    doc.text(company, 20, 63)
+    if (gstin) { doc.setTextColor('#818cf8'); doc.text(`GSTIN: ${gstin}`, 20, 70) }
+    
+    doc.setTextColor('#ffffff'); doc.setFontSize(12); doc.setFont('helvetica', 'bold')
+    doc.text('BILL TO:', 120, 55)
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(11)
+    doc.text(inv.client_name, 120, 63)
+    doc.setTextColor('#94a3b8'); doc.setFontSize(10)
+    if (inv.client_email) doc.text(inv.client_email, 120, 70)
+    
+    doc.setTextColor('#ffffff')
+    doc.text(`Issue: ${formatDate(inv.issue_date)}`, 20, gstin ? 82 : 75)
+    if (inv.due_date) doc.text(`Due: ${formatDate(inv.due_date)}`, 20, gstin ? 89 : 82)
+    
+    let y = gstin ? 100 : 93
+    doc.setFillColor(30, 30, 46); doc.rect(20, y, 170, 10, 'F')
+    doc.setTextColor('#ffffff'); doc.setFont('helvetica', 'bold')
+    doc.text('Description', 25, y + 7); doc.text('Qty', 110, y + 7); doc.text('Rate', 130, y + 7); doc.text('Amount', 160, y + 7)
+    y += 16; doc.setFont('helvetica', 'normal')
+    inv.items.forEach(item => {
+      if (y > 250) { doc.addPage(); doc.setFillColor(15, 15, 26); doc.rect(0, 0, 210, 297, 'F'); y = 20 }
+      doc.setTextColor('#f1f5f9')
+      doc.text(item.description, 25, y); doc.text(String(item.qty), 110, y)
+      doc.text(formatCurrency(item.rate), 130, y); doc.text(formatCurrency(item.qty * item.rate), 160, y)
+      doc.setDrawColor(40, 40, 60); doc.line(20, y + 4, 190, y + 4); y += 12
+    })
+    y += 10; doc.setFontSize(10); doc.setTextColor('#94a3b8')
+    doc.text('Subtotal:', 130, y); doc.setTextColor('#ffffff'); doc.text(formatCurrency(inv.subtotal), 160, y)
+    if (inv.gst_rate > 0) { y += 8; doc.setTextColor('#94a3b8'); doc.text(`GST (${inv.gst_rate}%):`, 130, y); doc.setTextColor('#ffffff'); doc.text(formatCurrency(inv.gst_amount), 160, y); y += 8 }
+    doc.setFillColor(99, 102, 241); doc.rect(125, y - 2, 65, 12, 'F')
+    doc.setTextColor('#ffffff'); doc.setFontSize(12); doc.setFont('helvetica', 'bold')
+    doc.text('TOTAL:', 130, y + 6); doc.text(formatCurrency(inv.total), 160, y + 6)
+    if (inv.notes) { y += 25; doc.setFontSize(10); doc.setTextColor('#ffffff'); doc.setFont('helvetica', 'bold'); doc.text('NOTES / TERMS:', 20, y); doc.setFont('helvetica', 'normal'); doc.setTextColor('#94a3b8'); doc.text(inv.notes, 20, y + 8, { maxWidth: 170 }) }
+    doc.setFontSize(9); doc.setTextColor('#94a3b8')
+    doc.text('Thank you for your business!', 105, 285, { align: 'center' })
+    doc.text('Generated by FinSight AI', 105, 290, { align: 'center' })
+  }
   
   doc.save(`FinSight_Invoice_${inv.invoice_number}.pdf`)
 }
@@ -151,6 +218,8 @@ export default function InvoicesPage() {
   const [showModal, setShowModal] = useState(false)
   const [saving, setSaving] = useState(false)
   const [userName, setUserName] = useState('')
+  const [selectedTemplate, setSelectedTemplate] = useState<InvoiceTemplate>('modern_dark')
+  const [businessInfo, setBusinessInfo] = useState({ company: '', address: '', gstin: '' })
   const [items, setItems] = useState<InvoiceItem[]>([{ description: '', qty: 1, rate: 0 }])
   const [form, setForm] = useState({ client_name: '', client_email: '', gst_rate: '18', status: 'pending', issue_date: new Date().toISOString().split('T')[0], due_date: '', notes: '' })
 
@@ -247,7 +316,7 @@ export default function InvoicesPage() {
                     </td>
                     <td className="px-5 py-3.5 text-slate-400 text-xs">{inv.due_date ? formatDate(inv.due_date) : '—'}</td>
                     <td className="px-5 py-3.5">
-                      <button onClick={() => downloadPDF(inv, userName)} className="text-indigo-400 hover:text-indigo-300 transition-colors p-1.5 hover:bg-indigo-500/10 rounded-lg" title="Download PDF">
+                      <button onClick={() => downloadPDF(inv, userName, selectedTemplate, businessInfo)} className="text-indigo-400 hover:text-indigo-300 transition-colors p-1.5 hover:bg-indigo-500/10 rounded-lg" title="Download PDF">
                         <Download size={15} />
                       </button>
                     </td>
@@ -267,6 +336,30 @@ export default function InvoicesPage() {
               <button onClick={() => setShowModal(false)} className="text-slate-500 hover:text-white"><X size={20} /></button>
             </div>
             <form onSubmit={handleSave} className="space-y-4">
+              {/* Template Selection */}
+              <div>
+                <label className="label flex items-center gap-1.5"><Palette size={13} /> Invoice Template</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {([['modern_dark', '🌙 Modern Dark', 'Dark theme with indigo accents'], ['classic_white', '📄 Classic White', 'Clean corporate layout'], ['minimal', '✨ Minimal', 'Ultra-clean, typography focused']] as const).map(([id, name, desc]) => (
+                    <button type="button" key={id} onClick={() => setSelectedTemplate(id)}
+                      className={`text-left p-3 rounded-xl border transition-all ${selectedTemplate === id ? 'border-indigo-500 bg-indigo-500/10' : 'border-[#1e1e2e] hover:border-[#2a2a3e]'}`}>
+                      <p className="text-xs font-semibold text-white">{name}</p>
+                      <p className="text-[10px] text-slate-500 mt-0.5">{desc}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Business Info */}
+              <div className="bg-[#0f0f1a] rounded-xl p-3 space-y-2">
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Your Business Details</p>
+                <div className="grid grid-cols-3 gap-2">
+                  <input type="text" value={businessInfo.company} onChange={e => setBusinessInfo(b => ({ ...b, company: e.target.value }))} className="input text-xs py-2" placeholder="Company name" />
+                  <input type="text" value={businessInfo.address} onChange={e => setBusinessInfo(b => ({ ...b, address: e.target.value }))} className="input text-xs py-2" placeholder="Address" />
+                  <input type="text" value={businessInfo.gstin} onChange={e => setBusinessInfo(b => ({ ...b, gstin: e.target.value }))} className="input text-xs py-2" placeholder="GSTIN (optional)" />
+                </div>
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="label">Client Name *</label>
